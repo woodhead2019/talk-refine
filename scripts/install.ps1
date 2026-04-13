@@ -141,9 +141,36 @@ if ($installPython) {
     Write-Host "[$step/$total] Installing Python packages..." -ForegroundColor Cyan
     $ErrorActionPreference = "Continue"
     pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet 2>&1 | Out-Null
-    pip install funasr modelscope pyaudio pyperclip pyautogui keyboard requests pystray Pillow pyyaml pywin32 --quiet 2>&1 | Out-Null
+    pip install funasr modelscope pyperclip pyautogui keyboard requests pystray Pillow pyyaml --quiet 2>&1 | Out-Null
+    
+    # pyaudio needs special handling (may need prebuilt wheel on some Python versions)
+    pip install pyaudio --quiet 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [WARN] pyaudio failed to install via pip. Trying pipwin..." -ForegroundColor Yellow
+        pip install pipwin --quiet 2>&1 | Out-Null
+        pipwin install pyaudio 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  [FAIL] pyaudio installation failed. Please install manually:" -ForegroundColor Red
+            Write-Host "         pip install pyaudio" -ForegroundColor Red
+        }
+    }
+
+    # pywin32 optional
+    pip install pywin32 --quiet 2>&1 | Out-Null
+
+    # Verify critical packages
+    $missing = @()
+    foreach ($pkg in @("pyaudio", "funasr", "torch", "yaml", "keyboard")) {
+        python -c "import $pkg" 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { $missing += $pkg }
+    }
+    if ($missing.Count -gt 0) {
+        Write-Host "  [WARN] Missing packages: $($missing -join ', ')" -ForegroundColor Yellow
+        Write-Host "         Please install manually before running TalkRefine" -ForegroundColor Yellow
+    } else {
+        Write-Host "  [OK] Dependencies installed and verified" -ForegroundColor Green
+    }
     $ErrorActionPreference = "Stop"
-    Write-Host "  [OK] Dependencies installed" -ForegroundColor Green
 }
 
 # ── ASR Model (SenseVoice) ──
