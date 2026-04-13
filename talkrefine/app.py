@@ -8,6 +8,16 @@ import tempfile
 import threading
 import argparse
 
+# Windows DPI awareness (must be before tkinter)
+import ctypes
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(2)
+except Exception:
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception:
+        pass
+
 # Handle pythonw.exe (no stdout)
 if sys.stdout is None:
     sys.stdout = open(os.devnull, "w")
@@ -84,12 +94,16 @@ class TalkRefineApp:
         self.prompt_template = ""
         self.overlay = None
         self.tray = None
+        # Load overlay UI strings based on config
+        ui_lang = config.get("ui_language", "zh")
+        from talkrefine.ui.overlay import get_overlay_strings
+        self.os = get_overlay_strings(ui_lang)
 
     def init_models(self):
         """Load ASR model and LLM provider."""
         print("⏳ Loading ASR model...")
         if self.overlay:
-            self.overlay.show("⏳ Loading model...")
+            self.overlay.show(self.os["loading"])
 
         self.asr = _create_asr_engine(self.config)
         self.asr.load()
@@ -99,30 +113,34 @@ class TalkRefineApp:
         print(f"✅ LLM: {self.llm.name}")
 
         from talkrefine.llm.prompts import load_prompt
-        self.prompt_template = load_prompt(self.config["llm"]["prompt"])
+        prompt_cfg = self.config["llm"]
+        # Support inline prompt_text from settings UI
+        if prompt_cfg.get("prompt_text"):
+            self.prompt_template = prompt_cfg["prompt_text"]
+        else:
+            self.prompt_template = load_prompt(prompt_cfg["prompt"])
 
         hotkey = self.config["hotkey"].upper()
         print(f"\n🟢 Ready! Press [{hotkey}] to record")
 
         if self.overlay:
-            self.overlay.set_status(f"🟢 Press {hotkey} to record", "#a6e3a1")
+            self.overlay.set_status(
+                self.os["ready"].format(hotkey=hotkey), "#a6e3a1")
             self.overlay.schedule_hide(2000)
 
     def toggle_recording(self):
-        """Called when hotkey is pressed."""
         if not self.recorder.recording:
             self._start_recording()
         else:
             threading.Thread(target=self._stop_and_process, daemon=True).start()
 
     def cancel_recording(self):
-        """Called when cancel key (ESC) is pressed."""
         if not self.recorder.recording:
             return
         self.recorder.stop()
         print("🚫 Recording cancelled")
         if self.overlay:
-            self.overlay.set_status("🚫 Cancelled", "#f9e2af")
+            self.overlay.set_status(self.os["cancelled"], "#f9e2af")
             self.overlay.schedule_hide(1500)
 
     def _start_recording(self):
@@ -137,17 +155,17 @@ class TalkRefineApp:
         frames = self.recorder.stop()
 
         if not frames:
-            self._show_warning("No audio detected")
+            self._show_warning(self.os["no_audio"])
             return
 
         duration = len(frames) * 1024 / SAMPLE_RATE
         if duration < 0.5:
-            self._show_warning("Too short")
+            self._show_warning(self.os["too_short"])
             return
 
         print(f"⏳ {duration:.1f}s recorded, recognizing...")
         if self.overlay:
-            self.overlay.set_status("⏳ Recognizing...", "#89b4fa")
+            self.overlay.set_status(self.os["recognizing"], "#89b4fa")
 
         # Save to temp WAV
         tmp_path = os.path.join(tempfile.gettempdir(),
@@ -165,7 +183,7 @@ class TalkRefineApp:
             import re
             cleaned = re.sub(r'[\s。，、！？,.!?\-—…]+', '', raw_text or '')
             if not cleaned:
-                self._show_warning("No speech detected")
+                self._show_warning(self.os["no_speech"])
                 return
 
             print(f"📝 Raw: {raw_text}")
@@ -175,12 +193,30 @@ class TalkRefineApp:
                 final_text = raw_text
             elif self.config["llm"]["enabled"]:
                 if self.overlay:
-                    self.overlay.set_status("✍️ Refining...", "#cba6f7")
+                    self.overlay.set_status(self.os["refining"], "#cba6f7")
                 final_text = self.llm.refine(raw_text, self.prompt_template)
             else:
                 final_text = raw_text
 
             print(f"✨ Result: {final_text}")
+
+            # Save to history
+            from talkrefine.history import add_entry
+            add_entry(
+                raw_text=raw_text,
+                refined_text=final_text,
+                duration=duration,
+                language=self.config["language"],
+                engine=self.config["asr"]["engine"],
+                llm=self.config["llm"]["model"] if self.config["llm"]["enabled"] else "",
+            )
+
+            # Refresh tray menu to show latest history
+            if self.tray:
+                try:
+                    self.tray.refresh_menu()
+                except Exception:
+                    pass
 
             # Output
             if self.overlay:
@@ -190,10 +226,10 @@ class TalkRefineApp:
             from talkrefine.platform import windows as plat
             if self.config["output"]["auto_paste"]:
                 plat.paste_text(final_text, self.config["output"]["preserve_clipboard"])
-                print("📋 Pasted")
+                print(self.os["pasted"])
             else:
                 plat.copy_text(final_text)
-                print("📋 Copied to clipboard")
+                print(self.os["copied"])
 
             if self.overlay:
                 self.overlay.schedule_hide(3000)
@@ -203,7 +239,7 @@ class TalkRefineApp:
             import traceback
             traceback.print_exc()
             if self.overlay:
-                self.overlay.set_status("❌ Error", "#f38ba8")
+                self.overlay.set_status(self.os["error"], "#f38ba8")
                 self.overlay.schedule_hide(3000)
         finally:
             try:
@@ -258,13 +294,23 @@ class TalkRefineApp:
             time.sleep(0.3)
             os._exit(0)
 
+        settings_win = None
+        history_win = None
+
         if self.config["ui"]["tray_icon"]:
             from talkrefine.ui.tray import TrayIcon
+            from talkrefine.ui.settings import SettingsWindow, HistoryWindow
+
+            settings_win = SettingsWindow(self.config)
+            history_win = HistoryWindow()
+
             self.tray = TrayIcon(
                 hotkey=hotkey,
                 on_quit=on_quit,
                 on_toggle_llm=lambda v: print(
                     f"LLM: {'✅ on' if v else '❌ off'}"),
+                on_open_settings=lambda: settings_win.show(),
+                on_open_history=lambda: history_win.show(),
             )
             self.tray.start()
 

@@ -26,6 +26,7 @@ class OllamaProvider(LLMProvider):
                     "model": self._model,
                     "prompt": prompt,
                     "stream": False,
+                    "think": False,  # Disable thinking mode (qwen3.5 etc.)
                     "options": {
                         "temperature": self._temperature,
                         "num_predict": self._max_tokens,

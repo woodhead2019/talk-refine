@@ -43,7 +43,7 @@ cd talk-refine
 # 1. 安装系统依赖
 winget install Gyan.FFmpeg
 winget install Ollama.Ollama
-ollama pull qwen2.5:3b
+ollama pull qwen3.5:2b
 
 # 2. 安装 Python 包
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
@@ -83,7 +83,7 @@ llm:
   enabled: true
   provider: "ollama"      # "ollama" | "openai"（兼容 API）| "none"
   endpoint: "http://localhost:11434"
-  model: "qwen2.5:3b"
+  model: "qwen3.5:2b"
   prompt: "default"       # "default" | "meeting" | "code" | 自定义 .txt 路径
 
 output:
@@ -102,7 +102,7 @@ output:
 
 | 提供者 | 配置方式 | 适用场景 |
 |--------|----------|----------|
-| **Ollama**（默认） | `ollama pull qwen2.5:3b` | 完全离线 |
+| **Ollama**（默认） | `ollama pull qwen3.5:2b` | 完全离线 |
 | **OpenAI 兼容** | 设置 endpoint + api_key | 云端 LLM（OpenAI、DeepSeek、vLLM 等） |
 | **None** | — | 仅转写，不润色 |
 
@@ -125,6 +125,17 @@ output:
 | 磁盘 | ~3 GB | ~5 GB |
 | 系统 | Windows 10+ | Windows 11 |
 | Python | 3.10+ | 3.12 |
+
+### 默认模型资源占用（实测）
+
+| 组件 | 模型 | 常驻内存 | CPU（空闲时） | 说明 |
+|------|------|----------|---------------|------|
+| **ASR** | SenseVoice-Small | ~3 GB | ~0% | 加载后常驻，识别时短暂占用 CPU |
+| **LLM** | Qwen3.5:2b (Ollama) | ~5 GB | ~0% | Ollama 按需加载，5 分钟无请求自动卸载 |
+| **合计** | — | **~8 GB** | — | 同时运行时的峰值内存 |
+
+> 💡 Ollama 会在 5 分钟无请求后自动释放 LLM 内存，实际常驻仅 ASR 的 ~3 GB。
+> 如需更低内存占用，可换用 `qwen3:1.7b`（~2.5 GB）或关闭 LLM 润色。
 
 ## 架构
 

@@ -17,7 +17,7 @@ DEFAULTS = {
         "enabled": True,
         "provider": "ollama",
         "endpoint": "http://localhost:11434",
-        "model": "qwen2.5:3b",
+        "model": "qwen3.5:2b",
         "api_key": "",
         "prompt": "default",
         "temperature": 0.3,

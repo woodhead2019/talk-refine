@@ -68,13 +68,13 @@ if ($ollamaPath) {
 }
 
 # Step 4: Pull LLM model
-Write-Host "[4/6] Pulling LLM model (qwen2.5:3b)..." -ForegroundColor Cyan
+Write-Host "[4/6] Pulling LLM model (qwen3.5:2b)..." -ForegroundColor Cyan
 $models = ollama list 2>&1
-if ($models -match "qwen2.5:3b") {
+if ($models -match "qwen3.5:2b") {
     Write-Host "  [OK] Model already downloaded" -ForegroundColor Green
 } else {
     Write-Host "  Downloading (~2GB)..." -ForegroundColor Yellow
-    ollama pull qwen2.5:3b
+    ollama pull qwen3.5:2b
     Write-Host "  [OK] Model ready" -ForegroundColor Green
 }
 

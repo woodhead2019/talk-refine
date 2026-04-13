@@ -2,6 +2,42 @@
 
 import tkinter as tk
 
+# Overlay strings by language
+_OVERLAY_STRINGS = {
+    "zh": {
+        "recording": "🎤 录音中... {hotkey}=完成  {cancel}=取消",
+        "recognizing": "⏳ 识别中...",
+        "refining": "✍️ 润色中...",
+        "cancelled": "🚫 已取消",
+        "no_audio": "⚠️ 未检测到音频",
+        "too_short": "⚠️ 录音太短",
+        "no_speech": "⚠️ 未识别到内容",
+        "error": "❌ 出错",
+        "ready": "🟢 按 {hotkey} 开始录音",
+        "loading": "⏳ 加载模型中...",
+        "pasted": "📋 已粘贴",
+        "copied": "📋 已复制",
+    },
+    "en": {
+        "recording": "🎤 Recording... {hotkey}=done  {cancel}=cancel",
+        "recognizing": "⏳ Recognizing...",
+        "refining": "✍️ Refining...",
+        "cancelled": "🚫 Cancelled",
+        "no_audio": "⚠️ No audio detected",
+        "too_short": "⚠️ Too short",
+        "no_speech": "⚠️ No speech detected",
+        "error": "❌ Error",
+        "ready": "🟢 Press {hotkey} to record",
+        "loading": "⏳ Loading model...",
+        "pasted": "📋 Pasted",
+        "copied": "📋 Copied",
+    },
+}
+
+
+def get_overlay_strings(lang: str = "zh") -> dict:
+    return _OVERLAY_STRINGS.get(lang, _OVERLAY_STRINGS["en"])
+
 
 class VolumeOverlay:
     """Semi-transparent floating window showing recording status and volume."""
@@ -13,7 +49,7 @@ class VolumeOverlay:
         self.root.overrideredirect(True)
         self.root.attributes("-alpha", 0.85)
 
-        self.width = 300
+        self.width = 320
         self.height = 60
         screen_w = self.root.winfo_screenwidth()
         screen_h = self.root.winfo_screenheight()
@@ -23,7 +59,7 @@ class VolumeOverlay:
         self.root.configure(bg="#1e1e2e")
 
         self.status_label = tk.Label(
-            self.root, text="TalkRefine", font=("Segoe UI", 11),
+            self.root, text="TalkRefine", font=("Microsoft YaHei UI", 11),
             fg="#cdd6f4", bg="#1e1e2e"
         )
         self.status_label.pack(pady=(6, 2))
@@ -42,7 +78,7 @@ class VolumeOverlay:
         self.root.withdraw()
         self._update_loop()
 
-    def show(self, text: str = "🎤 Recording..."):
+    def show(self, text: str = "🎤 录音中..."):
         self.set_status(text, "#a6e3a1")
         self.root.deiconify()
 
@@ -53,7 +89,6 @@ class VolumeOverlay:
         self.status_label.config(text=text, fg=color)
 
     def update_volume(self, volume: float, is_recording: bool):
-        """Called externally to feed volume data."""
         self._volume_ref = volume
         self._recording_ref = is_recording
 
@@ -65,11 +100,11 @@ class VolumeOverlay:
             bar_width = int(self._volume_ref * (self.width - 20))
             bar_width = min(bar_width, self.width - 20)
             if self._volume_ref < 0.3:
-                color = "#a6e3a1"  # green
+                color = "#a6e3a1"
             elif self._volume_ref < 0.7:
-                color = "#f9e2af"  # yellow
+                color = "#f9e2af"
             else:
-                color = "#f38ba8"  # red
+                color = "#f38ba8"
             self.canvas.coords(self._volume_bar, 0, 0, bar_width, 14)
             self.canvas.itemconfig(self._volume_bar, fill=color)
         else:

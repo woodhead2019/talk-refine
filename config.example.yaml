@@ -22,7 +22,7 @@ llm:
   endpoint: "http://localhost:11434"   # Ollama default
   # endpoint: "https://api.openai.com"  # OpenAI
   # endpoint: "https://api.deepseek.com" # DeepSeek
-  model: "qwen2.5:3b"    # Ollama: qwen2.5:3b, qwen2.5:7b, llama3.2:3b, etc.
+  model: "qwen3.5:2b"    # Ollama: qwen3.5:2b, qwen3.5:4b, qwen3:1.7b, etc.
                           # OpenAI: gpt-4o-mini, gpt-4o, etc.
   api_key: ""             # Required for OpenAI provider, leave empty for Ollama
   prompt: "default"       # Built-in: "default", "meeting", "code"
