@@ -68,21 +68,62 @@ if ($installPythonRT) {
     $step++
     Write-Host "[$step/$total] Checking Python..." -ForegroundColor Cyan
     $pyFound = Get-Command python -ErrorAction SilentlyContinue
+    $needInstall = $false
     if ($pyFound) {
         $pyVer = python --version 2>&1
-        Write-Host "  [OK] Already installed: $pyVer" -ForegroundColor Green
+        # Check version - need 3.10-3.12 (3.13+ has compatibility issues with many packages)
+        $verMatch = [regex]::Match($pyVer, '(\d+)\.(\d+)')
+        $major = [int]$verMatch.Groups[1].Value
+        $minor = [int]$verMatch.Groups[2].Value
+        if ($minor -ge 13) {
+            Write-Host "  [WARN] $pyVer detected - Python 3.13+ has compatibility issues" -ForegroundColor Yellow
+            Write-Host "         Many packages (torch, funasr, pystray) don't support 3.13 yet" -ForegroundColor Yellow
+            Write-Host "  Installing Python 3.12 alongside..." -ForegroundColor Yellow
+            $needInstall = $true
+        } elseif ($minor -lt 10) {
+            Write-Host "  [WARN] $pyVer is too old (need 3.10+)" -ForegroundColor Yellow
+            $needInstall = $true
+        } else {
+            Write-Host "  [OK] $pyVer" -ForegroundColor Green
+        }
     } else {
-        Write-Host "  Installing Python via winget..." -ForegroundColor Yellow
+        $needInstall = $true
+    }
+    if ($needInstall) {
+        Write-Host "  Installing Python 3.12 via winget..." -ForegroundColor Yellow
         winget install Python.Python.3.12 --accept-source-agreements --accept-package-agreements | Out-Null
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-        Write-Host "  [OK] Python installed" -ForegroundColor Green
+        # After installing 3.12, try to use it specifically
+        $py312 = Get-Command py -ErrorAction SilentlyContinue
+        if ($py312) {
+            Write-Host "  [OK] Python 3.12 installed. Use 'py -3.12' to run." -ForegroundColor Green
+            Write-Host "  [INFO] Creating venv with Python 3.12..." -ForegroundColor Cyan
+            $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+            $projectDir = Split-Path -Parent $scriptDir
+            Push-Location $projectDir
+            py -3.12 -m venv venv
+            .\venv\Scripts\Activate.ps1
+            Pop-Location
+            Write-Host "  [OK] Virtual environment created and activated" -ForegroundColor Green
+        } else {
+            Write-Host "  [OK] Python 3.12 installed" -ForegroundColor Green
+        }
     }
 } else {
-    # Still need to verify Python exists
+    # Still need to verify Python exists and version is compatible
     $pyFound = Get-Command python -ErrorAction SilentlyContinue
     if (-not $pyFound) {
-        Write-Host "[!] Python not found. Please install Python 3.10+ first." -ForegroundColor Red
-        Write-Host "    Download: https://python.org  or run: winget install Python.Python.3.12" -ForegroundColor Yellow
+        Write-Host "[!] Python not found. Please install Python 3.12:" -ForegroundColor Red
+        Write-Host "    winget install Python.Python.3.12" -ForegroundColor Yellow
+        exit 1
+    }
+    $pyVer = python --version 2>&1
+    $verMatch = [regex]::Match($pyVer, '(\d+)\.(\d+)')
+    $minor = [int]$verMatch.Groups[2].Value
+    if ($minor -ge 13) {
+        Write-Host "[!] $pyVer detected - Python 3.13+ is not supported yet." -ForegroundColor Red
+        Write-Host "    Please install Python 3.12: winget install Python.Python.3.12" -ForegroundColor Yellow
+        Write-Host "    Then create a venv: py -3.12 -m venv venv && .\venv\Scripts\Activate.ps1" -ForegroundColor Yellow
         exit 1
     }
 }
