@@ -285,7 +285,7 @@ class SettingsWindow:
         self.win.minsize(900, 800)
         # Set window icon
         try:
-            ico_path = Path(__file__).parent.parent.parent / "talkrefine.ico"
+            ico_path = Path(__file__).parent.parent.parent / "assets" / "talkrefine.ico"
             if ico_path.exists():
                 self.win.iconbitmap(str(ico_path))
         except Exception:
@@ -786,7 +786,7 @@ class HistoryWindow:
         self.win.resizable(True, True)
         self.win.minsize(850, 950)
         try:
-            ico_path = Path(__file__).parent.parent.parent / "talkrefine.ico"
+            ico_path = Path(__file__).parent.parent.parent / "assets" / "talkrefine.ico"
             if ico_path.exists():
                 self.win.iconbitmap(str(ico_path))
         except Exception:

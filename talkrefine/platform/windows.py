@@ -56,7 +56,7 @@ def setup_autostart(enable: bool = True):
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))))
     vbs_path = os.path.join(project_root, "scripts", "start_hidden.vbs")
-    ico_path = os.path.join(project_root, "talkrefine.ico")
+    ico_path = os.path.join(project_root, "assets", "talkrefine.ico")
 
     startup_folder = os.path.join(
         os.environ.get("APPDATA", ""),
@@ -120,7 +120,7 @@ def create_start_menu_shortcut():
         sc.WindowStyle = 7
         # Set icon
         project_root = os.path.dirname(scripts_dir)
-        ico_path = os.path.join(project_root, "talkrefine.ico")
+        ico_path = os.path.join(project_root, "assets", "talkrefine.ico")
         if os.path.exists(ico_path):
             sc.IconLocation = ico_path
         sc.Save()

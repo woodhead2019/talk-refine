@@ -28,6 +28,10 @@
         - 不支持中文
 ```
 
+## 截图
+
+![TalkRefine 设置界面与录音浮窗](assets/screenshot.png)
+
 ## 快速开始（Windows）
 
 ### 一键安装
@@ -148,9 +152,11 @@ output:
 ```
 
 ```
+assets/                     # 图片资源
+├── screenshot.png          #   截图
+├── talkrefine.ico          #   应用图标
+└── talkrefine.png          #   应用图标（PNG）
 run.pyw                     # 启动器（双击运行，无控制台窗口）
-talkrefine.ico              # 应用图标
-talkrefine.png              # 应用图标（PNG）
 talkrefine/
 ├── app.py              # 主应用
 ├── config.py           # 配置加载

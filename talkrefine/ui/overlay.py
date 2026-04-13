@@ -102,9 +102,9 @@ class VolumeOverlay:
 
         try:
             from pathlib import Path
-            ico_path = Path(__file__).parent.parent / "talkrefine.ico"
+            ico_path = Path(__file__).parent.parent / "assets" / "talkrefine.ico"
             if not ico_path.exists():
-                ico_path = Path(__file__).parent.parent.parent / "talkrefine.ico"
+                ico_path = Path(__file__).parent.parent.parent / "assets" / "talkrefine.ico"
             if ico_path.exists():
                 self.root.iconbitmap(str(ico_path))
         except Exception:
