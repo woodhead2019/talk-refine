@@ -140,14 +140,14 @@ if ($installPython) {
     $step++
     Write-Host "[$step/$total] Installing Python packages..." -ForegroundColor Cyan
     $ErrorActionPreference = "Continue"
-    pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet 2>&1 | Out-Null
-    pip install funasr modelscope pyperclip pyautogui keyboard requests pystray Pillow pyyaml --quiet 2>&1 | Out-Null
+    pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet --user 2>&1 | Out-Null
+    pip install funasr modelscope pyperclip pyautogui keyboard requests pystray Pillow pyyaml --quiet --user 2>&1 | Out-Null
     
     # pyaudio needs special handling (may need prebuilt wheel on some Python versions)
-    pip install pyaudio --quiet 2>&1 | Out-Null
+    pip install pyaudio --quiet --user 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  [WARN] pyaudio failed to install via pip. Trying pipwin..." -ForegroundColor Yellow
-        pip install pipwin --quiet 2>&1 | Out-Null
+        pip install pipwin --quiet --user 2>&1 | Out-Null
         pipwin install pyaudio 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  [FAIL] pyaudio installation failed. Please install manually:" -ForegroundColor Red
@@ -156,7 +156,7 @@ if ($installPython) {
     }
 
     # pywin32 optional
-    pip install pywin32 --quiet 2>&1 | Out-Null
+    pip install pywin32 --quiet --user 2>&1 | Out-Null
 
     # Verify critical packages
     $missing = @()
@@ -167,7 +167,7 @@ if ($installPython) {
     if ($missing.Count -gt 0) {
         Write-Host "  [WARN] Missing packages: $($missing -join ', ')" -ForegroundColor Yellow
         Write-Host "         Retrying install..." -ForegroundColor Yellow
-        pip install pyaudio funasr torch torchaudio pystray Pillow pyyaml keyboard pyperclip pyautogui requests modelscope --quiet 2>&1 | Out-Null
+        pip install pyaudio funasr torch torchaudio pystray Pillow pyyaml keyboard pyperclip pyautogui requests modelscope --quiet --user 2>&1 | Out-Null
         # Re-check
         $still_missing = @()
         foreach ($pkg in $missing) {
