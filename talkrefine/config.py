@@ -11,8 +11,9 @@ DEFAULTS = {
     "ui_language": "zh",
     "asr": {
         "engine": "sensevoice",
-        "model": "iic/SenseVoiceSmall",
+        "model": "FunAudioLLM/SenseVoiceSmall",
         "device": "cpu",
+        "hub": "hf",
     },
     "llm": {
         "enabled": True,

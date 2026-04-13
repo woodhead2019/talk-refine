@@ -40,7 +40,10 @@ def _create_asr_engine(config: dict):
 
     if engine == "sensevoice":
         from talkrefine.asr.sensevoice import SenseVoiceEngine
-        return SenseVoiceEngine(model=asr_cfg["model"], device=asr_cfg["device"])
+        return SenseVoiceEngine(
+            model=asr_cfg["model"], device=asr_cfg["device"],
+            hub=asr_cfg.get("hub", "hf"),
+        )
     elif engine in ("whisper", "faster-whisper"):
         from talkrefine.asr.whisper import WhisperEngine
         return WhisperEngine(model=asr_cfg["model"], device=asr_cfg["device"])

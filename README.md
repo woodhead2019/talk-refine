@@ -83,8 +83,9 @@ language: "auto"          # "auto", "zh", "en", "ja", ...
 
 asr:
   engine: "sensevoice"    # "sensevoice"（中文最佳）| "whisper"（多语言）
-  model: "iic/SenseVoiceSmall"
+  model: "FunAudioLLM/SenseVoiceSmall"
   device: "cpu"           # "cpu" | "cuda"
+  hub: "hf"               # "hf"（HuggingFace）| "ms"（ModelScope，国内推荐）
 
 llm:
   enabled: true
