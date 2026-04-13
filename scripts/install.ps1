@@ -51,7 +51,7 @@ $installFFmpeg    = Ask-YesNo "  [2] ffmpeg (audio processing)"
 $installOllama    = Ask-YesNo "  [3] Ollama (local LLM runtime)"
 $installLLMModel  = Ask-YesNo "  [4] Qwen3.5:2b model (~2GB, for text refinement)"
 $installPython    = Ask-YesNo "  [5] Python packages (torch, funasr, etc.)"
-$installASRModel  = Ask-YesNo "  [6] SenseVoice ASR model (~200MB, for speech recognition)"
+$installASRModel  = Ask-YesNo "  [6] SenseVoice ASR model (~944MB, for speech recognition)"
 $setupAutostart   = Ask-YesNo "  [7] Autostart + Start Menu shortcut"
 
 Write-Host ""
@@ -229,7 +229,7 @@ if ($installPython) {
 # ── ASR Model (SenseVoice) ──
 if ($installASRModel) {
     $step++
-    Write-Host "[$step/$total] Downloading ASR model (SenseVoice ~200MB)..." -ForegroundColor Cyan
+    Write-Host "[$step/$total] Downloading ASR model (SenseVoice ~944MB)..." -ForegroundColor Cyan
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     $projectDir = Split-Path -Parent $scriptDir
     Push-Location $projectDir
