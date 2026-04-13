@@ -173,9 +173,14 @@ if ($setupAutostart) {
     Push-Location $projectDir
     $ErrorActionPreference = "Continue"
     python -m talkrefine --install 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [WARN] Shortcut setup had errors. You can set up later via:" -ForegroundColor Yellow
+        Write-Host "         python -m talkrefine --install" -ForegroundColor Yellow
+    } else {
+        Write-Host "  [OK] Setup complete" -ForegroundColor Green
+    }
     $ErrorActionPreference = "Stop"
     Pop-Location
-    Write-Host "  [OK] Setup complete" -ForegroundColor Green
 }
 
 Write-Host ""
