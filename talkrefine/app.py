@@ -31,7 +31,6 @@ except Exception:
 
 from talkrefine import __version__
 from talkrefine.config import load_config
-from talkrefine.recorder import Recorder, SAMPLE_RATE, CHANNELS
 
 
 def _create_asr_engine(config: dict):
@@ -88,6 +87,7 @@ class TalkRefineApp:
 
     def __init__(self, config: dict):
         self.config = config
+        from talkrefine.recorder import Recorder
         self.recorder = Recorder()
         self.asr = None
         self.llm = None
@@ -214,6 +214,7 @@ class TalkRefineApp:
             self.overlay.show(text)
 
     def _stop_and_process(self):
+        from talkrefine.recorder import SAMPLE_RATE, CHANNELS
         frames = self.recorder.stop()
 
         if not frames:
