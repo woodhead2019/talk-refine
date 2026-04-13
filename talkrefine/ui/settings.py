@@ -140,7 +140,7 @@ _STRINGS = {
 # ── ASR model options (combined engine + model) ──
 
 _ASR_OPTIONS = [
-    ("sensevoice", "iic/SenseVoiceSmall", "SenseVoice - iic/SenseVoiceSmall"),
+    ("sensevoice", "FunAudioLLM/SenseVoiceSmall", "SenseVoice - FunAudioLLM/SenseVoiceSmall"),
     ("whisper", "tiny", "Whisper - tiny"),
     ("whisper", "base", "Whisper - base"),
     ("whisper", "small", "Whisper - small"),
@@ -404,7 +404,7 @@ class SettingsWindow:
 
         asr = self.config.get("asr", {})
         cur_engine = asr.get("engine", "sensevoice")
-        cur_model = asr.get("model", "iic/SenseVoiceSmall")
+        cur_model = asr.get("model", "FunAudioLLM/SenseVoiceSmall")
 
         # Check which engines are installed
         avail = _check_asr_availability()
@@ -498,7 +498,7 @@ class SettingsWindow:
         for engine, model, label in _ASR_OPTIONS:
             if text.startswith(label):
                 return engine, model
-        return "sensevoice", "iic/SenseVoiceSmall"
+        return "sensevoice", "FunAudioLLM/SenseVoiceSmall"
 
     # ────────────── Tab 3: LLM ──────────────
 

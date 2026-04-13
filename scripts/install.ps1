@@ -181,34 +181,27 @@ if ($installPython) {
     $step++
     Write-Host "[$step/$total] Installing Python packages..." -ForegroundColor Cyan
     $ErrorActionPreference = "Continue"
-    
-    # Detect if in a venv (no --user needed) or system Python (--user needed)
-    $inVenv = python -c "import sys; print(sys.prefix != sys.base_prefix)" 2>&1
-    if ($inVenv -eq "True") {
-        $userFlag = ""
-        Write-Host "  (virtual environment detected)" -ForegroundColor Gray
-    } else {
-        $userFlag = "--user"
-        Write-Host "  (system Python, using --user install)" -ForegroundColor Gray
-    }
-    
-    pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet $userFlag 2>&1 | Out-Null
-    pip install funasr modelscope pyperclip pyautogui keyboard requests pystray Pillow pyyaml --quiet $userFlag 2>&1 | Out-Null
-    
-    # pyaudio needs special handling (may need prebuilt wheel on some Python versions)
-    pip install pyaudio --quiet $userFlag 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "  [WARN] pyaudio failed to install via pip. Trying pipwin..." -ForegroundColor Yellow
-        pip install pipwin --quiet $userFlag 2>&1 | Out-Null
-        pipwin install pyaudio 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  [FAIL] pyaudio installation failed. Please install manually:" -ForegroundColor Red
-            Write-Host "         pip install pyaudio" -ForegroundColor Red
-        }
-    }
 
-    # pywin32 optional
-    pip install pywin32 --quiet $userFlag 2>&1 | Out-Null
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $projectDir = Split-Path -Parent $scriptDir
+    Push-Location $projectDir
+
+    # Always use a virtual environment for isolation
+    $venvPython = Join-Path $projectDir "venv\Scripts\python.exe"
+    if (-not (Test-Path $venvPython)) {
+        Write-Host "  Creating virtual environment..." -ForegroundColor Yellow
+        python -m venv venv
+    }
+    .\venv\Scripts\Activate.ps1
+    Write-Host "  (virtual environment activated)" -ForegroundColor Gray
+
+    # PyTorch CPU must be installed first (needs special index URL)
+    Write-Host "  Installing PyTorch (CPU)..." -ForegroundColor Yellow
+    pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --quiet 2>&1 | Out-Null
+
+    # Install talkrefine + all dependencies from pyproject.toml
+    Write-Host "  Installing talkrefine and dependencies..." -ForegroundColor Yellow
+    pip install -e ".[win32]" --quiet 2>&1 | Out-Null
 
     # Verify critical packages
     $missing = @()
@@ -217,32 +210,19 @@ if ($installPython) {
         if ($LASTEXITCODE -ne 0) { $missing += $pkg }
     }
     if ($missing.Count -gt 0) {
-        Write-Host "  [WARN] Missing packages: $($missing -join ', ')" -ForegroundColor Yellow
-        Write-Host "         Retrying install..." -ForegroundColor Yellow
-        pip install pyaudio funasr torch torchaudio pystray Pillow pyyaml keyboard pyperclip pyautogui requests modelscope --quiet $userFlag 2>&1 | Out-Null
-        # Re-check
-        $still_missing = @()
-        foreach ($pkg in $missing) {
-            python -c "import $pkg" 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { $still_missing += $pkg }
-        }
-        if ($still_missing.Count -gt 0) {
-            Write-Host "  [FAIL] Still missing: $($still_missing -join ', ')" -ForegroundColor Red
-            Write-Host "         Try running in a virtual environment:" -ForegroundColor Yellow
-            Write-Host "         python -m venv venv" -ForegroundColor Yellow
-            Write-Host "         .\venv\Scripts\Activate.ps1" -ForegroundColor Yellow
-            Write-Host "         Then re-run this installer" -ForegroundColor Yellow
-            Write-Host ""
-            Write-Host "  ========================================" -ForegroundColor Red
-            Write-Host "  Installation FAILED - missing packages" -ForegroundColor Red
-            Write-Host "  ========================================" -ForegroundColor Red
-            exit 1
-        } else {
-            Write-Host "  [OK] Dependencies installed and verified (after retry)" -ForegroundColor Green
-        }
+        Write-Host "  [FAIL] Missing packages: $($missing -join ', ')" -ForegroundColor Red
+        Write-Host "         Try deleting the venv folder and re-running this installer" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "  ========================================" -ForegroundColor Red
+        Write-Host "  Installation FAILED - missing packages" -ForegroundColor Red
+        Write-Host "  ========================================" -ForegroundColor Red
+        Pop-Location
+        exit 1
     } else {
-        Write-Host "  [OK] Dependencies installed and verified" -ForegroundColor Green
+        Write-Host "  [OK] All dependencies installed and verified" -ForegroundColor Green
     }
+
+    Pop-Location
     $ErrorActionPreference = "Stop"
 }
 
@@ -253,10 +233,12 @@ if ($installASRModel) {
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     $projectDir = Split-Path -Parent $scriptDir
     Push-Location $projectDir
+    $venvActivate = Join-Path $projectDir "venv\Scripts\Activate.ps1"
+    if (Test-Path $venvActivate) { & $venvActivate }
     $ErrorActionPreference = "Continue"
     python -c "
 from funasr import AutoModel
-model = AutoModel(model='iic/SenseVoiceSmall', trust_remote_code=True, device='cpu', disable_update=True)
+model = AutoModel(model='FunAudioLLM/SenseVoiceSmall', trust_remote_code=True, device='cpu', disable_update=True, hub='hf')
 print('Model downloaded successfully')
 " 2>&1 | Out-Null
     $ErrorActionPreference = "Stop"
@@ -271,6 +253,8 @@ if ($setupAutostart) {
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     $projectDir = Split-Path -Parent $scriptDir
     Push-Location $projectDir
+    $venvActivate = Join-Path $projectDir "venv\Scripts\Activate.ps1"
+    if (Test-Path $venvActivate) { & $venvActivate }
     $ErrorActionPreference = "Continue"
     python -m talkrefine --install 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -289,6 +273,6 @@ Write-Host "  Installation complete!" -ForegroundColor Green
 Write-Host "  ========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Start: Search 'TalkRefine' in Start Menu"
-Write-Host "  Or run: python -m talkrefine"
+Write-Host "  Or run: .\venv\Scripts\Activate.ps1; python -m talkrefine"
 Write-Host "  Hotkey: Press F6 to record (configurable in settings)"
 Write-Host ""

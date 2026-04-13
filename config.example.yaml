@@ -11,9 +11,10 @@ language: "auto"          # "auto", "zh", "en", "ja", "ko", etc.
 # ── ASR (Speech Recognition) ────────────────────
 asr:
   engine: "sensevoice"    # "sensevoice" (best for Chinese) | "whisper" (multilingual)
-  model: "iic/SenseVoiceSmall"   # SenseVoice: "iic/SenseVoiceSmall"
-                                  # Whisper: "tiny", "base", "small", "medium", "large-v3"
+  model: "FunAudioLLM/SenseVoiceSmall"  # SenseVoice: "FunAudioLLM/SenseVoiceSmall"
+                                         # Whisper: "tiny", "base", "small", "medium", "large-v3"
   device: "cpu"           # "cpu" | "cuda" (NVIDIA GPU) | "mps" (Apple Silicon)
+  hub: "hf"               # "hf" (HuggingFace) | "ms" (ModelScope, for China mainland)
 
 # ── LLM (Text Refinement) ───────────────────────
 llm:
