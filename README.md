@@ -12,7 +12,10 @@
 - 🌍 **多语言**，中文、英文、日文、韩文等
 - 🧠 **可插拔引擎**，通过配置文件切换 ASR 模型和 LLM
 - 📋 **智能粘贴**，自动粘贴到光标，剪贴板内容不丢失
-- 🎨 **悬浮 UI**，录音音量条 + 系统托盘图标
+- 🎨 **Modern overlay**，AI 渐变音量条 + 系统托盘图标
+- 🌍 **Settings UI with i18n**（中文/English）
+- 📜 **History**，支持搜索、复制原文/润色结果
+- 🔄 **Auto-discover Ollama models**，自动发现本地已拉取模型
 
 ## 效果演示
 
@@ -56,9 +59,9 @@ python -m talkrefine
 ## 使用方法
 
 1. 启动（开始菜单搜 `TalkRefine`，或 `python -m talkrefine`）
-2. 按 **F7** 开始录音
+2. 按 **F6** 开始录音
 3. 自然说话
-4. 按 **F7** 停止 → 自动识别、润色、粘贴
+4. 按 **F6** 停止 → 自动识别、润色、粘贴
 5. 按 **ESC** 取消录音（丢弃不处理）
 
 系统托盘图标（右下角）→ 右键菜单：
@@ -70,7 +73,7 @@ python -m talkrefine
 复制 `config.example.yaml` 为 `config.yaml`，按需修改：
 
 ```yaml
-hotkey: "f7"              # 录音快捷键（f9, ctrl+shift+r 等均可）
+hotkey: "f6"              # 录音快捷键（f9, ctrl+shift+r 等均可）
 cancel_key: "esc"         # 取消录音
 language: "auto"          # "auto", "zh", "en", "ja", ...
 
@@ -84,7 +87,7 @@ llm:
   provider: "ollama"      # "ollama" | "openai"（兼容 API）| "none"
   endpoint: "http://localhost:11434"
   model: "qwen3.5:2b"
-  prompt: "default"       # "default" | "meeting" | "code" | 自定义 .txt 路径
+  prompt: "default"       # "default"（prompts/default.txt）| 自定义 .txt 路径
 
 output:
   auto_paste: true        # 自动粘贴到光标
@@ -108,12 +111,9 @@ output:
 
 ### Prompt 模板
 
-内置模板位于 `prompts/` 目录：
-- **default** — 通用：去口水词、自动分点
-- **meeting** — 会议纪要：提取决议和待办
-- **code** — 技术口述：保留代码术语
+内置模板 `prompts/default.txt`：通用去口水词、自动分点。
 
-创建自定义 `.txt` 文件，将 `llm.prompt` 设为文件路径即可。
+在 Settings UI 中可直接编辑 prompt，并通过 **"restore default"** 按钮恢复默认。也可创建自定义 `.txt` 文件，将 `llm.prompt` 设为文件路径。
 
 ## 系统要求
 
@@ -148,9 +148,13 @@ output:
 ```
 
 ```
+run.pyw                     # 启动器（双击运行，无控制台窗口）
+talkrefine.ico              # 应用图标
+talkrefine.png              # 应用图标（PNG）
 talkrefine/
 ├── app.py              # 主应用
 ├── config.py           # 配置加载
+├── history.py          # 历史记录（搜索、导出）
 ├── recorder.py         # 录音模块
 ├── asr/                # 语音识别引擎（可插拔）
 │   ├── base.py
@@ -165,7 +169,9 @@ talkrefine/
 ├── platform/           # 平台适配
 │   └── windows.py
 └── ui/
-    ├── overlay.py      #   悬浮音量条
+    ├── icon.py         #   图标加载
+    ├── overlay.py      #   悬浮音量条（AI 渐变）
+    ├── settings.py     #   设置界面（i18n）
     └── tray.py         #   系统托盘
 ```
 

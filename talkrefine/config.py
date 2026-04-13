@@ -5,7 +5,7 @@ import copy
 from pathlib import Path
 
 DEFAULTS = {
-    "hotkey": "f7",
+    "hotkey": "f6",
     "cancel_key": "esc",
     "language": "auto",
     "ui_language": "zh",
@@ -21,7 +21,7 @@ DEFAULTS = {
         "model": "qwen3.5:2b",
         "api_key": "",
         "prompt": "default",
-        "temperature": 0.3,
+        "temperature": 0.1,
         "max_tokens": 512,
     },
     "output": {

@@ -13,6 +13,7 @@ except Exception:
 import tkinter as tk
 from tkinter import ttk, messagebox
 import subprocess
+import os
 import urllib.request
 import urllib.error
 import json
@@ -169,29 +170,17 @@ _ASR_INSTALL_HINT = {
     "whisper": "pip install openai-whisper",
 }
 
-# ── Prompt presets ──
+# ── Prompt loading ──
 
-_PROMPT_PRESETS = {
-    "general": (
-        "Convert the following speech transcription into clean written text. "
-        "Remove filler words, false starts, and repetitions. "
-        "Keep the original meaning and tone. Output only the result.\n\n"
-        "Raw text: {text}"
-    ),
-    "meeting": (
-        "You are a meeting notes assistant. Clean up the following speech "
-        "transcription into clear, structured meeting notes. Use bullet points "
-        "for action items. Remove filler words and repetitions.\n\n"
-        "Raw text: {text}"
-    ),
-    "code": (
-        "The following is a speech transcription about programming. "
-        "Clean it up into clear technical writing. Preserve code-related "
-        "terms, variable names, and technical jargon exactly. "
-        "Output only the cleaned text.\n\n"
-        "Raw text: {text}"
-    ),
-}
+def _load_default_prompt() -> str:
+    """Load the default prompt from prompts/default.txt."""
+    prompt_path = Path(__file__).parent.parent.parent / "prompts" / "default.txt"
+    if prompt_path.exists():
+        return prompt_path.read_text(encoding="utf-8")
+    return (
+        "清理以下语音识别文本。删除语气词和重复内容，保持原始用词，"
+        "多个要点用分点列出。只输出结果。\n\n原始文本：{text}"
+    )
 
 
 # ── Utility functions ──
@@ -211,21 +200,13 @@ def detect_devices() -> list[str]:
 
 
 def is_autostart_enabled() -> bool:
-    """Check if TalkRefine is in Windows startup registry."""
-    try:
-        import winreg
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                             r"Software\Microsoft\Windows\CurrentVersion\Run",
-                             0, winreg.KEY_READ)
-        try:
-            winreg.QueryValueEx(key, "TalkRefine")
-            winreg.CloseKey(key)
-            return True
-        except FileNotFoundError:
-            winreg.CloseKey(key)
-            return False
-    except Exception:
-        return False
+    """Check if TalkRefine is in Windows startup folder."""
+    shortcut = os.path.join(
+        os.environ.get("APPDATA", ""),
+        r"Microsoft\Windows\Start Menu\Programs\Startup",
+        "TalkRefine.lnk"
+    )
+    return os.path.exists(shortcut)
 
 
 def discover_ollama_models() -> list[str]:
@@ -265,17 +246,13 @@ def _load_prompt_from_config(config: dict) -> str:
     # Inline text takes precedence
     if llm.get("prompt_text"):
         return llm["prompt_text"]
-    name_or_path = llm.get("prompt", "default")
-    if name_or_path in ("default", "general"):
-        return _PROMPT_PRESETS["general"]
-    if name_or_path in _PROMPT_PRESETS:
-        return _PROMPT_PRESETS[name_or_path]
-    # Try loading from prompts module
+    # Load from prompts/default.txt
     try:
         from talkrefine.llm.prompts import load_prompt
+        name_or_path = llm.get("prompt", "default")
         return load_prompt(name_or_path)
     except Exception:
-        return _PROMPT_PRESETS["general"]
+        return _load_default_prompt()
 
 
 # ────────────────────────────────────────────────────────────
@@ -394,7 +371,7 @@ class SettingsWindow:
         lang_inner = ttk.Frame(rec_frame)
         lang_inner.pack(fill="x")
         for code, label in [("auto", self.s["auto_detect"]),
-                            ("zh", self.s["chinese"]),
+                            ("zh", "中文"),
                             ("en", "English"),
                             ("ja", "日本語"),
                             ("ko", "한국어")]:
@@ -595,8 +572,12 @@ class SettingsWindow:
         prompt_frame.pack(fill="x", pady=(0, 10))
 
         self.prompt_text = tk.Text(prompt_frame, height=6, wrap="word", font=_FONT)
-        self.prompt_text.pack(fill="x", padx=4, pady=(0, 6))
+        self.prompt_text.pack(fill="x", padx=4, pady=(0, 4))
         self.prompt_text.insert("1.0", _load_prompt_from_config(self.config))
+
+        restore_label = "🔄 恢复默认" if self.s == _STRINGS["zh"] else "🔄 Restore Default"
+        ttk.Button(prompt_frame, text=restore_label, width=14,
+                   command=self._restore_default_prompt).pack(anchor="e", padx=4, pady=(0, 4))
 
 
 
@@ -605,7 +586,7 @@ class SettingsWindow:
         temp_frame.pack(fill="x", pady=(0, 4))
         ttk.Label(temp_frame, text=self.s["temperature"] + ":").pack(
             side="left", padx=8)
-        self.llm_temp_var = tk.DoubleVar(value=llm.get("temperature", 0.3))
+        self.llm_temp_var = tk.DoubleVar(value=llm.get("temperature", 0.1))
         ttk.Scale(temp_frame, from_=0.0, to=1.0, variable=self.llm_temp_var,
                   orient="horizontal", length=220).pack(side="left")
         self.temp_label = ttk.Label(temp_frame,
@@ -617,9 +598,20 @@ class SettingsWindow:
         self._on_provider_change()
 
     def _load_preset(self, name: str):
-        if name in _PROMPT_PRESETS:
+        """Load prompt from prompts/ directory."""
+        try:
+            from talkrefine.llm.prompts import load_prompt
+            text = load_prompt(name)
             self.prompt_text.delete("1.0", "end")
-            self.prompt_text.insert("1.0", _PROMPT_PRESETS[name])
+            self.prompt_text.insert("1.0", text)
+        except Exception:
+            pass
+
+    def _restore_default_prompt(self):
+        """Restore prompt to the default template from prompts/default.txt."""
+        text = _load_default_prompt()
+        self.prompt_text.delete("1.0", "end")
+        self.prompt_text.insert("1.0", text)
 
     def _update_temp_label(self, *_args):
         try:
@@ -718,7 +710,6 @@ class SettingsWindow:
                 "endpoint": self.llm_endpoint_var.get().strip(),
                 "model": self.llm_model_var.get(),
                 "api_key": self.llm_api_key_var.get(),
-                "prompt_text": prompt_text,
                 "temperature": round(self.llm_temp_var.get(), 2),
                 "max_tokens": self.config.get("llm", {}).get("max_tokens", 512),
             },
@@ -728,6 +719,13 @@ class SettingsWindow:
             },
             "ui": self.config.get("ui", {"overlay": True, "tray_icon": True}),
         }
+
+        # Only store prompt_text if user edited it (different from default template)
+        default_prompt = _load_default_prompt()
+        if prompt_text and prompt_text.strip() != default_prompt.strip():
+            new_config["llm"]["prompt_text"] = prompt_text
+        else:
+            new_config["llm"]["prompt"] = "default"
 
         config_path = Path(__file__).parent.parent.parent / "config.yaml"
         try:

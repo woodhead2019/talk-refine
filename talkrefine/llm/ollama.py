@@ -6,7 +6,7 @@ from .base import LLMProvider
 
 class OllamaProvider(LLMProvider):
 
-    def __init__(self, endpoint: str, model: str, temperature: float = 0.3,
+    def __init__(self, endpoint: str, model: str, temperature: float = 0.1,
                  max_tokens: int = 512):
         self._endpoint = endpoint.rstrip("/")
         self._model = model

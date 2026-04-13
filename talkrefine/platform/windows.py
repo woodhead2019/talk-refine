@@ -52,28 +52,50 @@ def copy_text(text: str):
 
 
 def setup_autostart(enable: bool = True):
-    """Add/remove from Windows startup via registry."""
-    import winreg
+    """Add/remove from Windows startup folder."""
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+    vbs_path = os.path.join(project_root, "scripts", "start_hidden.vbs")
+    ico_path = os.path.join(project_root, "talkrefine.ico")
 
-    app_name = "TalkRefine"
-    reg_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-    vbs_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__)))), "scripts", "start_hidden.vbs")
+    startup_folder = os.path.join(
+        os.environ.get("APPDATA", ""),
+        r"Microsoft\Windows\Start Menu\Programs\Startup"
+    )
+    shortcut_path = os.path.join(startup_folder, "TalkRefine.lnk")
 
-    if enable:
-        command = f'wscript.exe "{vbs_path}"'
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0,
-                             winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, command)
-        winreg.CloseKey(key)
-    else:
+    # Clean up old registry entry if present
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r"Software\Microsoft\Windows\CurrentVersion\Run",
+                             0, winreg.KEY_SET_VALUE)
         try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0,
-                                 winreg.KEY_SET_VALUE)
-            winreg.DeleteValue(key, app_name)
-            winreg.CloseKey(key)
+            winreg.DeleteValue(key, "TalkRefine")
         except FileNotFoundError:
             pass
+        winreg.CloseKey(key)
+    except Exception:
+        pass
+
+    if enable:
+        try:
+            import win32com.client
+            shell = win32com.client.Dispatch("WScript.Shell")
+            sc = shell.CreateShortCut(shortcut_path)
+            sc.TargetPath = "wscript.exe"
+            sc.Arguments = f'"{vbs_path}"'
+            sc.WorkingDirectory = project_root
+            sc.Description = "TalkRefine"
+            sc.WindowStyle = 7
+            if os.path.exists(ico_path):
+                sc.IconLocation = ico_path
+            sc.Save()
+        except Exception as e:
+            print(f"⚠️  Startup shortcut: {e}")
+    else:
+        if os.path.exists(shortcut_path):
+            os.remove(shortcut_path)
 
 
 def create_start_menu_shortcut():

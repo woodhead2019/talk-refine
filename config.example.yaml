@@ -2,7 +2,7 @@
 # Copy this file to config.yaml and customize.
 
 # ── Hotkeys ──────────────────────────────────────
-hotkey: "f7"              # Press to start/stop recording
+hotkey: "f6"              # Press to start/stop recording
 cancel_key: "esc"         # Press to cancel current recording
 
 # ── Language ─────────────────────────────────────
@@ -25,9 +25,9 @@ llm:
   model: "qwen3.5:2b"    # Ollama: qwen3.5:2b, qwen3.5:4b, qwen3:1.7b, etc.
                           # OpenAI: gpt-4o-mini, gpt-4o, etc.
   api_key: ""             # Required for OpenAI provider, leave empty for Ollama
-  prompt: "default"       # Built-in: "default", "meeting", "code"
+  prompt: "default"       # Built-in: "default" (prompts/default.txt)
                           # Or path to custom .txt file
-  temperature: 0.3        # Lower = more deterministic
+  temperature: 0.1        # Lower = more deterministic
   max_tokens: 512
 
 # ── Output ───────────────────────────────────────

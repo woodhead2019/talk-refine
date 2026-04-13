@@ -7,7 +7,7 @@ from .base import LLMProvider
 class OpenAIProvider(LLMProvider):
 
     def __init__(self, endpoint: str, model: str, api_key: str = "",
-                 temperature: float = 0.3, max_tokens: int = 512):
+                 temperature: float = 0.1, max_tokens: int = 512):
         self._endpoint = endpoint.rstrip("/")
         self._model = model
         self._api_key = api_key

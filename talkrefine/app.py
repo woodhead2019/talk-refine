@@ -210,7 +210,8 @@ class TalkRefineApp:
         cancel = self.config.get("cancel_key", "esc").upper()
         print(f"🎙️  Recording...")
         if self.overlay:
-            self.overlay.show(f"🎤 Recording... {hotkey}=done  {cancel}=cancel")
+            text = self.os["recording"].format(hotkey=hotkey, cancel=cancel)
+            self.overlay.show(text)
 
     def _stop_and_process(self):
         frames = self.recorder.stop()
