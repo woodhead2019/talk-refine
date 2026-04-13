@@ -1,0 +1,46 @@
+# TalkRefine Configuration
+# Copy this file to config.yaml and customize.
+
+# ── Hotkeys ──────────────────────────────────────
+hotkey: "f7"              # Press to start/stop recording
+cancel_key: "esc"         # Press to cancel current recording
+
+# ── Language ─────────────────────────────────────
+language: "auto"          # "auto", "zh", "en", "ja", "ko", etc.
+
+# ── ASR (Speech Recognition) ────────────────────
+asr:
+  engine: "sensevoice"    # "sensevoice" (best for Chinese) | "whisper" (multilingual)
+  model: "iic/SenseVoiceSmall"   # SenseVoice: "iic/SenseVoiceSmall"
+                                  # Whisper: "tiny", "base", "small", "medium", "large-v3"
+  device: "cpu"           # "cpu" | "cuda" (NVIDIA GPU) | "mps" (Apple Silicon)
+
+# ── LLM (Text Refinement) ───────────────────────
+llm:
+  enabled: true           # Set false to get raw transcription only
+  provider: "ollama"      # "ollama" | "openai" (OpenAI-compatible API) | "none"
+  endpoint: "http://localhost:11434"   # Ollama default
+  # endpoint: "https://api.openai.com"  # OpenAI
+  # endpoint: "https://api.deepseek.com" # DeepSeek
+  model: "qwen2.5:3b"    # Ollama: qwen2.5:3b, qwen2.5:7b, llama3.2:3b, etc.
+                          # OpenAI: gpt-4o-mini, gpt-4o, etc.
+  api_key: ""             # Required for OpenAI provider, leave empty for Ollama
+  prompt: "default"       # Built-in: "default", "meeting", "code"
+                          # Or path to custom .txt file
+  temperature: 0.3        # Lower = more deterministic
+  max_tokens: 512
+
+# ── Output ───────────────────────────────────────
+output:
+  auto_paste: true        # Paste result at cursor automatically
+  preserve_clipboard: true  # Restore original clipboard after pasting
+
+# ── UI ───────────────────────────────────────────
+ui:
+  overlay: true           # Floating volume bar at bottom of screen
+  tray_icon: true         # System tray icon with right-click menu
+
+# ── Recording ───────────────────────────────────
+recording:
+  sample_rate: 16000      # Audio sample rate (16000 recommended)
+  min_duration: 0.5       # Minimum recording duration in seconds
