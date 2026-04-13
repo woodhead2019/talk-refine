@@ -55,6 +55,7 @@ def find_config_path() -> Path | None:
     """Search for config.yaml in current dir, script dir, and user config dir."""
     candidates = [
         Path.cwd() / CONFIG_FILENAME,
+        Path(__file__).parent.parent.parent / CONFIG_FILENAME,
         Path(__file__).parent.parent / CONFIG_FILENAME,
         Path.home() / ".config" / "talkrefine" / CONFIG_FILENAME,
     ]

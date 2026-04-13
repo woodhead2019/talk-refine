@@ -58,7 +58,7 @@ _STRINGS = {
         "chinese": "中文",
         "hotkey_conflict": "⚠️ 此快捷键可能与输入法冲突",
         "save_success": "保存成功",
-        "save_msg": "配置已保存，重启 TalkRefine 生效。",
+        "save_msg": "配置已生效。ASR 模型更改需要重启。",
         "history_title": "TalkRefine 历史记录",
         "time_col": "时间",
         "duration_col": "时长",
@@ -111,7 +111,7 @@ _STRINGS = {
         "chinese": "Chinese",
         "hotkey_conflict": "⚠️ May conflict with input method",
         "save_success": "Saved",
-        "save_msg": "Config saved. Restart TalkRefine to apply.",
+        "save_msg": "Config applied. ASR model changes require restart.",
         "history_title": "TalkRefine History",
         "time_col": "Time",
         "duration_col": "Duration",
@@ -259,10 +259,10 @@ class SettingsWindow:
 
         self.win = tk.Toplevel()
         self.win.title(self.s["settings_title"])
-        self.win.geometry("620x760")
+        self.win.geometry("700x800")
         self.win.attributes("-topmost", True)
         self.win.resizable(True, True)
-        self.win.minsize(580, 700)
+        self.win.minsize(650, 750)
 
         style = ttk.Style(self.win)
         style.configure("TNotebook.Tab", font=_FONT, padding=[14, 5])
@@ -493,17 +493,7 @@ class SettingsWindow:
         self.prompt_text.pack(fill="x", padx=4, pady=(0, 6))
         self.prompt_text.insert("1.0", _load_prompt_from_config(self.config))
 
-        preset_bar = ttk.Frame(prompt_frame)
-        preset_bar.pack(fill="x", padx=4)
-        ttk.Label(preset_bar, text=self.s["prompt_presets"] + ":").pack(
-            side="left", padx=(0, 6))
-        for key, label_key in [("general", "general_preset"),
-                               ("meeting", "meeting_preset"),
-                               ("code", "code_preset")]:
-            ttk.Button(
-                preset_bar, text=self.s[label_key], width=8,
-                command=lambda k=key: self._load_preset(k),
-            ).pack(side="left", padx=2)
+
 
         # Temperature
         temp_frame = ttk.Frame(tab)
@@ -634,7 +624,7 @@ class SettingsWindow:
             "ui": self.config.get("ui", {"overlay": True, "tray_icon": True}),
         }
 
-        config_path = Path(__file__).parent.parent / "config.yaml"
+        config_path = Path(__file__).parent.parent.parent / "config.yaml"
         try:
             with open(config_path, "w", encoding="utf-8") as f:
                 yaml.dump(new_config, f, allow_unicode=True,
@@ -677,10 +667,10 @@ class HistoryWindow:
         self._show_all = True
         self.win = tk.Toplevel()
         self.win.title(self.s["history_title"])
-        self.win.geometry("750x620")
+        self.win.geometry("950x800")
         self.win.attributes("-topmost", True)
         self.win.resizable(True, True)
-        self.win.minsize(650, 500)
+        self.win.minsize(850, 700)
 
         # Toolbar
         toolbar = ttk.Frame(self.win, padding=8)
@@ -733,7 +723,10 @@ class HistoryWindow:
         scrollbar.pack(side="right", fill="y")
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
 
-        # Detail panel - two separate text areas
+        style = ttk.Style(self.win)
+        style.configure("Treeview", rowheight=36)
+
+        # Detail panel- two separate text areas
         detail_frame = ttk.Frame(self.win, padding=(10, 0, 10, 10))
         detail_frame.pack(fill="both", expand=False)
 
@@ -741,7 +734,7 @@ class HistoryWindow:
         raw_label_frame = ttk.LabelFrame(detail_frame,
             text=self.s["raw_col"], padding=4)
         raw_label_frame.pack(fill="x", pady=(0, 4))
-        self.raw_text = tk.Text(raw_label_frame, height=4, wrap="word", font=_FONT,
+        self.raw_text = tk.Text(raw_label_frame, height=5, wrap="word", font=_FONT,
                                 state="normal", cursor="arrow")
         self.raw_text.pack(fill="x")
         raw_btn = ttk.Button(raw_label_frame, text=self.s["copy_raw"], width=16,
@@ -752,7 +745,7 @@ class HistoryWindow:
         refined_label_frame = ttk.LabelFrame(detail_frame,
             text=self.s["refined_col"], padding=4)
         refined_label_frame.pack(fill="x")
-        self.refined_text = tk.Text(refined_label_frame, height=4, wrap="word",
+        self.refined_text = tk.Text(refined_label_frame, height=5, wrap="word",
                                     font=_FONT, state="normal", cursor="arrow")
         self.refined_text.pack(fill="x")
         refined_btn = ttk.Button(refined_label_frame, text=self.s["copy_refined"],
@@ -808,8 +801,8 @@ class HistoryWindow:
             dur = f"{entry.get('duration', 0)}s"
             self.tree.insert("", "end", values=(
                 ts, dur,
-                raw[:60].replace("\n", " "),
-                refined[:60].replace("\n", " "),
+                raw[:80].replace("\n", " "),
+                refined[:80].replace("\n", " "),
             ))
 
     def _on_select(self, _event):

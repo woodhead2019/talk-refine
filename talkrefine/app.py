@@ -143,6 +143,48 @@ class TalkRefineApp:
             self.overlay.set_status(self.os["cancelled"], "#f9e2af")
             self.overlay.schedule_hide(1500)
 
+    def reload_config(self, new_config: dict):
+        """Hot-reload config. ASR model changes still need restart."""
+        old_asr = (self.config["asr"]["engine"], self.config["asr"]["model"])
+        new_asr = (new_config["asr"]["engine"], new_config["asr"]["model"])
+        old_hotkey = self.config["hotkey"]
+        old_cancel = self.config.get("cancel_key", "esc")
+
+        self.config = new_config
+
+        # Update UI language
+        from talkrefine.ui.overlay import get_overlay_strings
+        self.os = get_overlay_strings(new_config.get("ui_language", "zh"))
+
+        # Re-register hotkeys if changed
+        import keyboard
+        new_hotkey = new_config["hotkey"]
+        new_cancel = new_config.get("cancel_key", "esc")
+        if new_hotkey != old_hotkey or new_cancel != old_cancel:
+            keyboard.unhook_all_hotkeys()
+            from talkrefine.platform import windows as plat
+            plat.register_hotkey(new_hotkey, self.toggle_recording)
+            plat.register_hotkey(new_cancel, self.cancel_recording)
+            print(f"🔄 Hotkeys updated: {new_hotkey.upper()} / {new_cancel.upper()}")
+
+        # Recreate LLM provider
+        self.llm = _create_llm_provider(new_config)
+        print(f"🔄 LLM: {self.llm.name}")
+
+        # Reload prompt
+        prompt_cfg = new_config["llm"]
+        if prompt_cfg.get("prompt_text"):
+            self.prompt_template = prompt_cfg["prompt_text"]
+        else:
+            from talkrefine.llm.prompts import load_prompt
+            self.prompt_template = load_prompt(prompt_cfg["prompt"])
+
+        # ASR model change requires restart
+        if new_asr != old_asr:
+            print("⚠️  ASR model changed, restart required")
+        else:
+            print("✅ Config applied (no restart needed)")
+
     def _start_recording(self):
         self.recorder.start()
         hotkey = self.config["hotkey"].upper()
@@ -301,7 +343,7 @@ class TalkRefineApp:
             from talkrefine.ui.tray import TrayIcon
             from talkrefine.ui.settings import SettingsWindow, HistoryWindow
 
-            settings_win = SettingsWindow(self.config)
+            settings_win = SettingsWindow(self.config, on_save=self.reload_config)
             history_win = HistoryWindow()
 
             self.tray = TrayIcon(
@@ -367,6 +409,16 @@ def main():
         return
 
     config = load_config(args.config)
+
+    # Single instance check (Windows named mutex)
+    import ctypes
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, True, "TalkRefine_SingleInstance")
+    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        print("⚠️  TalkRefine 已在运行中，请勿重复启动。")
+        print("   请在系统托盘找到 TalkRefine 图标。")
+        ctypes.windll.kernel32.CloseHandle(mutex)
+        return
+
     app = TalkRefineApp(config)
     app.run()
 
