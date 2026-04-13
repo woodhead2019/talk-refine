@@ -140,27 +140,44 @@ class TrayIcon:
         threading.Thread(target=self._on_quit, daemon=True).start()
 
     def refresh_menu(self):
-        pass
+        """Rebuild the native pystray menu with current language and recent history."""
+        if not self._icon:
+            return
+        self._icon.menu = self._build_native_menu()
+        self._icon.update_menu()
+
+    def _build_native_menu(self):
+        s = self._s
+        items = []
+
+        # Recent history entries
+        history = load_recent(5)
+        if history:
+            items.append(pystray.MenuItem(s["recent"],
+                lambda icon, item: None, enabled=False))
+            for entry in history:
+                refined = entry.get("refined", "")
+                label = _truncate(refined)
+                def make_copy(text):
+                    return lambda icon, item: _copy_to_clipboard(text)
+                items.append(pystray.MenuItem(f"  {label}", make_copy(refined)))
+            items.append(pystray.Menu.SEPARATOR)
+
+        items.extend([
+            pystray.MenuItem(s["settings"], self._on_left_click, default=True, visible=False),
+            pystray.MenuItem(s["history"],
+                lambda icon, item: self._tk_root.after(0, self._open_history) if self._tk_root else None),
+            pystray.MenuItem(s["settings"],
+                lambda icon, item: self._tk_root.after(0, self._open_settings) if self._tk_root else None),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(s["quit"], lambda icon, item: self._quit()),
+        ])
+        return pystray.Menu(*items)
 
     def start(self):
         """Start tray icon."""
-        # pystray menu: default item = left click → settings
-        # Right-click shows native menu with "退出" as fallback
-        # But we also intercept right-click via Windows message hook
-        menu = pystray.Menu(
-            # Default (left-click / double-click) → open settings
-            pystray.MenuItem("设置", self._on_left_click, default=True, visible=False),
-            # Right-click native fallback
-            pystray.MenuItem("📜 历史记录",
-                           lambda icon, item: self._tk_root.after(0, self._open_history) if self._tk_root else None),
-            pystray.MenuItem("⚙️ 设置",
-                           lambda icon, item: self._tk_root.after(0, self._open_settings) if self._tk_root else None),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("退出", lambda icon, item: self._quit()),
-        )
-
         self._icon = pystray.Icon("talkrefine", create_app_icon(128),
-                                   "TalkRefine", menu)
+                                   "TalkRefine", self._build_native_menu())
         self._icon.run_detached()
 
     def stop(self):

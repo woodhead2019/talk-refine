@@ -164,10 +164,11 @@ class TalkRefineApp:
             if ui_lang in _STRINGS:
                 self._settings_win.s = _STRINGS[ui_lang]
 
-        # Update tray language
+        # Update tray language + rebuild native menu
         if self.tray:
             from talkrefine.ui.tray import _TRAY_STRINGS
             self.tray._s = _TRAY_STRINGS.get(ui_lang, _TRAY_STRINGS["zh"])
+            self.tray.refresh_menu()
 
         # Update history window language
         if self._history_win:

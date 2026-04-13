@@ -29,7 +29,7 @@ def load_prompt(name_or_path: str) -> str:
 
     # Hardcoded fallback
     return (
-        "请将以下语音识别文本转换为干净的书面语。"
-        "删除口水词和重复内容，只输出结果。\n\n"
+        "清理以下语音识别文本。删除语气词和重复内容，保持原始用词，"
+        "多个要点用分点列出。只输出结果。\n\n"
         "原始文本：{text}"
     )

@@ -20,6 +20,7 @@ from pathlib import Path
 
 _FONT = ("Microsoft YaHei UI", 10)
 _FONT_BOLD = ("Microsoft YaHei UI", 10, "bold")
+_FONT_SMALL = ("Microsoft YaHei UI", 9)
 _FONT_HEADING = ("Microsoft YaHei UI", 11, "bold")
 
 # ── Localisation strings ──
@@ -301,10 +302,10 @@ class SettingsWindow:
 
         self.win = tk.Toplevel()
         self.win.title(self.s["settings_title"])
-        self.win.geometry("850x850")
+        self.win.geometry("950x850")
         self.win.attributes("-topmost", True)
         self.win.resizable(True, True)
-        self.win.minsize(800, 800)
+        self.win.minsize(900, 800)
         # Set window icon
         try:
             ico_path = Path(__file__).parent.parent.parent / "talkrefine.ico"
@@ -431,22 +432,22 @@ class SettingsWindow:
         # Check which engines are installed
         avail = _check_asr_availability()
 
-        # Build display labels with availability status
+        # Only show installed models in dropdown
         display_values: list[str] = []
         current_display = ""
         for engine, model, label in _ASR_OPTIONS:
+            if not avail.get(engine, False):
+                continue
             disp = label
             if engine == "sensevoice":
                 disp += f" ({self.s['recommended_cn']})"
-            if not avail.get(engine, False):
-                disp += " ⚠️"
             display_values.append(disp)
             if engine == cur_engine and model == cur_model:
                 current_display = disp
-        if not current_display:
+        if not current_display and display_values:
             current_display = display_values[0]
 
-        # Model combobox
+        # ── Installed models ──
         frame = ttk.LabelFrame(
             tab, text=f"🎙️ {self.s['asr_model']}", padding=10)
         frame.pack(fill="x", pady=(0, 10))
@@ -459,14 +460,6 @@ class SettingsWindow:
                      values=display_values, width=42,
                      state="readonly", font=_FONT)
         self.asr_combo.grid(row=0, column=1, sticky="w", padx=8, pady=4)
-
-        # Install hint label
-        self.asr_install_hint = ttk.Label(frame, text="", foreground="gray",
-                                           font=_FONT_SMALL)
-        self.asr_install_hint.grid(row=1, column=0, columnspan=2,
-                                    sticky="w", padx=8)
-        self.asr_combo.bind("<<ComboboxSelected>>", self._on_asr_select)
-        self._on_asr_select()  # show hint for current selection
 
         # Device
         devices = detect_devices()
@@ -482,16 +475,45 @@ class SettingsWindow:
                      values=devices, width=14, state=state, font=_FONT).grid(
             row=1, column=1, sticky="w", padx=8, pady=4)
 
-    def _on_asr_select(self, _event=None):
-        """Show install hint if selected ASR engine is not installed."""
-        engine, _ = self._parse_asr_selection()
-        avail = _check_asr_availability()
-        if not avail.get(engine, False):
-            hint = _ASR_INSTALL_HINT.get(engine, "")
-            self.asr_install_hint.configure(
-                text=f"⚠️ Not installed. Run: {hint}", foreground="red")
-        else:
-            self.asr_install_hint.configure(text="✅ Installed", foreground="green")
+        # ── Install more engines section ──
+        not_installed = [e for e in ("sensevoice", "whisper") if not avail.get(e, False)]
+        if not_installed:
+            install_frame = ttk.LabelFrame(
+                tab, text="📦 " + ("安装更多引擎" if self.s == _STRINGS["zh"] else "Install More Engines"),
+                padding=10)
+            install_frame.pack(fill="x", pady=(5, 0))
+
+            for engine in not_installed:
+                row_frame = ttk.Frame(install_frame)
+                row_frame.pack(fill="x", pady=2)
+
+                name = "SenseVoice (FunASR)" if engine == "sensevoice" else "Whisper (OpenAI)"
+                cmd = _ASR_INSTALL_HINT[engine]
+
+                ttk.Label(row_frame, text=f"  {name}:", font=_FONT).pack(side="left")
+                cmd_entry = ttk.Entry(row_frame, font=_FONT_SMALL, width=35)
+                cmd_entry.insert(0, cmd)
+                cmd_entry.configure(state="readonly")
+                cmd_entry.pack(side="left", padx=6)
+
+                def make_copy(text, entry):
+                    def _copy():
+                        tab.clipboard_clear()
+                        tab.clipboard_append(text)
+                        entry.configure(state="normal")
+                        entry.delete(0, "end")
+                        entry.insert(0, "✅ Copied!")
+                        entry.configure(state="readonly")
+                        tab.after(1500, lambda: (
+                            entry.configure(state="normal"),
+                            entry.delete(0, "end"),
+                            entry.insert(0, text),
+                            entry.configure(state="readonly"),
+                        ))
+                    return _copy
+
+                ttk.Button(row_frame, text="📋",  width=3,
+                          command=make_copy(cmd, cmd_entry)).pack(side="left")
 
     def _parse_asr_selection(self) -> tuple[str, str]:
         """Extract (engine, model) from the combined ASR combobox value."""
