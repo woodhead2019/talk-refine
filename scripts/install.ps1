@@ -160,13 +160,26 @@ if ($installPython) {
 
     # Verify critical packages
     $missing = @()
-    foreach ($pkg in @("pyaudio", "funasr", "torch", "yaml", "keyboard")) {
+    foreach ($pkg in @("pyaudio", "funasr", "torch", "yaml", "keyboard", "pystray", "PIL")) {
         python -c "import $pkg" 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { $missing += $pkg }
     }
     if ($missing.Count -gt 0) {
         Write-Host "  [WARN] Missing packages: $($missing -join ', ')" -ForegroundColor Yellow
-        Write-Host "         Please install manually before running TalkRefine" -ForegroundColor Yellow
+        Write-Host "         Retrying install..." -ForegroundColor Yellow
+        pip install pyaudio funasr torch torchaudio pystray Pillow pyyaml keyboard pyperclip pyautogui requests modelscope --quiet 2>&1 | Out-Null
+        # Re-check
+        $still_missing = @()
+        foreach ($pkg in $missing) {
+            python -c "import $pkg" 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { $still_missing += $pkg }
+        }
+        if ($still_missing.Count -gt 0) {
+            Write-Host "  [FAIL] Still missing: $($still_missing -join ', ')" -ForegroundColor Red
+            Write-Host "         Please install manually before running TalkRefine" -ForegroundColor Red
+        } else {
+            Write-Host "  [OK] Dependencies installed and verified (after retry)" -ForegroundColor Green
+        }
     } else {
         Write-Host "  [OK] Dependencies installed and verified" -ForegroundColor Green
     }
