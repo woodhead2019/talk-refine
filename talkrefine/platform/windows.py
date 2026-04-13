@@ -51,6 +51,27 @@ def copy_text(text: str):
     pyperclip.copy(text)
 
 
+def _create_shortcut_ps(shortcut_path, target, arguments, working_dir, description,
+                        icon_path=None):
+    """Create .lnk shortcut using PowerShell (fallback when pywin32 unavailable)."""
+    import subprocess
+    ps_lines = [
+        '$ws = New-Object -ComObject WScript.Shell',
+        f'$sc = $ws.CreateShortcut("{shortcut_path}")',
+        f'$sc.TargetPath = "{target}"',
+        f"$sc.Arguments = '{arguments}'",
+        f'$sc.WorkingDirectory = "{working_dir}"',
+        f'$sc.Description = "{description}"',
+        '$sc.WindowStyle = 7',
+    ]
+    if icon_path and os.path.exists(icon_path):
+        ps_lines.append(f'$sc.IconLocation = "{icon_path}"')
+    ps_lines.append('$sc.Save()')
+    ps_script = '; '.join(ps_lines)
+    subprocess.run(["powershell", "-Command", ps_script],
+                   capture_output=True, timeout=10)
+
+
 def setup_autostart(enable: bool = True):
     """Add/remove from Windows startup folder."""
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(
@@ -91,6 +112,11 @@ def setup_autostart(enable: bool = True):
             if os.path.exists(ico_path):
                 sc.IconLocation = ico_path
             sc.Save()
+        except ImportError:
+            # Fallback: use PowerShell to create shortcut
+            _create_shortcut_ps(shortcut_path, "wscript.exe",
+                                f'"{vbs_path}"', project_root,
+                                "TalkRefine", ico_path)
         except Exception as e:
             print(f"⚠️  Startup shortcut: {e}")
     else:
@@ -100,30 +126,33 @@ def setup_autostart(enable: bool = True):
 
 def create_start_menu_shortcut():
     """Create a Start Menu shortcut."""
+    start_menu = os.path.join(
+        os.environ.get("APPDATA", ""),
+        r"Microsoft\Windows\Start Menu\Programs"
+    )
+    shortcut_path = os.path.join(start_menu, "TalkRefine.lnk")
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+    vbs_path = os.path.join(project_root, "scripts", "start_hidden.vbs")
+    ico_path = os.path.join(project_root, "assets", "talkrefine.ico")
+
     try:
         import win32com.client
-        start_menu = os.path.join(
-            os.environ.get("APPDATA", ""),
-            r"Microsoft\Windows\Start Menu\Programs"
-        )
-        shortcut_path = os.path.join(start_menu, "TalkRefine.lnk")
-        scripts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__)))), "scripts")
-        vbs_path = os.path.join(scripts_dir, "start_hidden.vbs")
-
         shell = win32com.client.Dispatch("WScript.Shell")
         sc = shell.CreateShortCut(shortcut_path)
         sc.TargetPath = "wscript.exe"
         sc.Arguments = f'"{vbs_path}"'
-        sc.WorkingDirectory = scripts_dir
+        sc.WorkingDirectory = project_root
         sc.Description = "TalkRefine - Voice to refined text"
         sc.WindowStyle = 7
-        # Set icon
-        project_root = os.path.dirname(scripts_dir)
-        ico_path = os.path.join(project_root, "assets", "talkrefine.ico")
         if os.path.exists(ico_path):
             sc.IconLocation = ico_path
         sc.Save()
+        return shortcut_path
+    except ImportError:
+        _create_shortcut_ps(shortcut_path, "wscript.exe",
+                            f'"{vbs_path}"', project_root,
+                            "TalkRefine - Voice to refined text", ico_path)
         return shortcut_path
     except Exception as e:
         print(f"⚠️  Failed to create shortcut: {e}")
