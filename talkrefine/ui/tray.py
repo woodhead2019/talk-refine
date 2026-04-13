@@ -1,33 +1,48 @@
-"""System tray icon."""
+"""System tray icon with custom popup menu."""
 
 import threading
+import tkinter as tk
 import pystray
 from PIL import Image, ImageDraw
 
 from talkrefine.history import load_recent
 
+_MENU_FONT = ("Microsoft YaHei UI", 10)
+_MENU_FONT_SMALL = ("Microsoft YaHei UI", 9)
+
+_TRAY_STRINGS = {
+    "zh": {
+        "recent": "── 最近记录 ──",
+        "history": "📜 历史记录",
+        "settings": "⚙️ 设置",
+        "quit": "退出",
+    },
+    "en": {
+        "recent": "── Recent ──",
+        "history": "📜 History",
+        "settings": "⚙️ Settings",
+        "quit": "Quit",
+    },
+}
+
 
 def _create_icon_image() -> Image.Image:
-    size = 64
+    size = 128
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    draw.rounded_rectangle([20, 6, 44, 36], radius=10, fill="#a6e3a1")
-    draw.arc([14, 18, 50, 48], start=0, end=180, fill="#cdd6f4", width=3)
-    draw.line([32, 48, 32, 58], fill="#cdd6f4", width=3)
-    draw.line([22, 58, 42, 58], fill="#cdd6f4", width=3)
+    draw.rounded_rectangle([40, 12, 88, 72], radius=20, fill="#a6e3a1")
+    draw.arc([28, 36, 100, 96], start=0, end=180, fill="#cdd6f4", width=5)
+    draw.line([64, 96, 64, 116], fill="#cdd6f4", width=5)
+    draw.line([44, 116, 84, 116], fill="#cdd6f4", width=5)
     return img
 
 
-def _truncate(text: str, max_len: int = 30) -> str:
-    """Truncate text and append ellipsis if needed."""
+def _truncate(text: str, max_len: int = 18) -> str:
     text = text.replace("\n", " ")
-    if len(text) > max_len:
-        return text[:max_len] + "..."
-    return text
+    return text[:max_len] + "..." if len(text) > max_len else text
 
 
 def _copy_to_clipboard(text: str):
-    """Copy text to the system clipboard."""
     try:
         import pyperclip
         pyperclip.copy(text)
@@ -36,10 +51,14 @@ def _copy_to_clipboard(text: str):
 
 
 class TrayIcon:
-    """System tray icon with context menu."""
+    """System tray icon.
+    - Left click (default action) → open settings
+    - Right click → custom popup menu (history, settings, quit)
+    """
 
     def __init__(self, hotkey: str, on_quit, on_toggle_llm=None,
-                 on_open_settings=None, on_open_history=None):
+                 on_open_settings=None, on_open_history=None,
+                 tk_root=None, ui_language: str = "zh"):
         self._hotkey = hotkey
         self._on_quit = on_quit
         self._on_toggle_llm = on_toggle_llm
@@ -47,6 +66,8 @@ class TrayIcon:
         self._on_open_history = on_open_history
         self._llm_enabled = True
         self._icon = None
+        self._tk_root = tk_root
+        self._s = _TRAY_STRINGS.get(ui_language, _TRAY_STRINGS["zh"])
 
     @property
     def llm_enabled(self) -> bool:
@@ -56,79 +77,89 @@ class TrayIcon:
     def llm_enabled(self, value: bool):
         self._llm_enabled = value
 
-    def _build_menu(self) -> pystray.Menu:
-        """Build the tray context menu with recent history entries."""
-        def quit_action(icon, item):
-            icon.stop()
-            threading.Thread(target=self._on_quit, daemon=True).start()
+    # ── Left click: open settings ──
 
-        def toggle_llm(icon, item):
-            self._llm_enabled = not self._llm_enabled
-            if self._on_toggle_llm:
-                self._on_toggle_llm(self._llm_enabled)
+    def _on_left_click(self, icon, item=None):
+        if self._tk_root and self._on_open_settings:
+            self._tk_root.after(0, self._on_open_settings)
 
-        def open_settings(icon, item):
-            if self._on_open_settings:
-                self._on_open_settings()
+    # ── Right click: popup menu ──
 
-        def open_history(icon, item):
-            if self._on_open_history:
-                self._on_open_history()
+    def _on_right_click(self, icon, item=None):
+        if self._tk_root is None:
+            return
+        self._tk_root.after(0, self._show_popup)
 
-        # Recent history items
-        history = load_recent()
+    def _show_popup(self):
+        menu = tk.Menu(self._tk_root, tearoff=0, font=_MENU_FONT,
+                       bg="#ffffff", fg="#1e1e2e", activebackground="#e0e0e0",
+                       activeforeground="#1e1e2e", relief="flat", bd=1)
 
-        items = []
-
+        # Recent history
+        history = load_recent(5)
         if history:
-            items.append(pystray.MenuItem(
-                "── 最近记录 ──",
-                lambda icon, item: None,
-                enabled=False,
-            ))
+            menu.add_command(label=self._s["recent"], state="disabled",
+                           font=_MENU_FONT_SMALL)
             for entry in history:
-                refined = entry.get("refined") or entry.get("text", "")
+                refined = entry.get("refined", "")
                 label = _truncate(refined)
+                menu.add_command(label=f"  {label}",
+                               command=lambda t=refined: _copy_to_clipboard(t),
+                               font=_MENU_FONT)
+            menu.add_separator()
 
-                def make_copy_action(text):
-                    return lambda icon, item: _copy_to_clipboard(text)
+        menu.add_command(label=f"  {self._s['history']}", command=self._open_history,
+                        font=_MENU_FONT)
+        menu.add_command(label=f"  {self._s['settings']}", command=self._open_settings,
+                        font=_MENU_FONT)
+        menu.add_separator()
+        menu.add_command(label=f"  {self._s['quit']}", command=self._quit, font=_MENU_FONT)
 
-                items.append(pystray.MenuItem(
-                    label,
-                    make_copy_action(refined),
-                ))
-            items.append(pystray.Menu.SEPARATOR)
+        # Position near cursor
+        try:
+            x = self._tk_root.winfo_pointerx()
+            y = self._tk_root.winfo_pointery()
+        except Exception:
+            x, y = 0, 0
 
-        items.extend([
-            pystray.MenuItem(
-                f"按 {self._hotkey.upper()} 录音",
-                lambda icon, item: None,
-                enabled=False,
-            ),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem(
-                "LLM 润色",
-                toggle_llm,
-                checked=lambda item: self._llm_enabled,
-            ),
-            pystray.MenuItem("📜 历史记录", open_history),
-            pystray.MenuItem("⚙️ 设置", open_settings),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("退出", quit_action),
-        ])
+        # tk_popup auto-closes when clicking outside
+        menu.tk_popup(x, y - 10)
 
-        return pystray.Menu(*items)
+    def _open_settings(self):
+        if self._on_open_settings:
+            self._on_open_settings()
+
+    def _open_history(self):
+        if self._on_open_history:
+            self._on_open_history()
+
+    def _quit(self):
+        if self._icon:
+            self._icon.stop()
+        threading.Thread(target=self._on_quit, daemon=True).start()
 
     def refresh_menu(self):
-        """Rebuild the menu with fresh history data."""
-        if self._icon:
-            self._icon.menu = self._build_menu()
-            self._icon.update_menu()
+        pass
 
     def start(self):
-        """Start tray icon (non-blocking, runs detached)."""
+        """Start tray icon."""
+        # pystray menu: default item = left click → settings
+        # Right-click shows native menu with "退出" as fallback
+        # But we also intercept right-click via Windows message hook
+        menu = pystray.Menu(
+            # Default (left-click / double-click) → open settings
+            pystray.MenuItem("设置", self._on_left_click, default=True, visible=False),
+            # Right-click native fallback
+            pystray.MenuItem("📜 历史记录",
+                           lambda icon, item: self._tk_root.after(0, self._open_history) if self._tk_root else None),
+            pystray.MenuItem("⚙️ 设置",
+                           lambda icon, item: self._tk_root.after(0, self._open_settings) if self._tk_root else None),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("退出", lambda icon, item: self._quit()),
+        )
+
         self._icon = pystray.Icon("talkrefine", _create_icon_image(),
-                                   "TalkRefine", self._build_menu())
+                                   "TalkRefine", menu)
         self._icon.run_detached()
 
     def stop(self):

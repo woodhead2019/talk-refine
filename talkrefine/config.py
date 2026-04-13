@@ -8,6 +8,7 @@ DEFAULTS = {
     "hotkey": "f7",
     "cancel_key": "esc",
     "language": "auto",
+    "ui_language": "zh",
     "asr": {
         "engine": "sensevoice",
         "model": "iic/SenseVoiceSmall",

@@ -353,6 +353,8 @@ class TalkRefineApp:
                     f"LLM: {'✅ on' if v else '❌ off'}"),
                 on_open_settings=lambda: settings_win.show(),
                 on_open_history=lambda: history_win.show(),
+                tk_root=self.overlay.root if self.overlay else None,
+                ui_language=self.config.get("ui_language", "zh"),
             )
             self.tray.start()
 

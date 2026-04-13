@@ -49,7 +49,7 @@ class VolumeOverlay:
         self.root.overrideredirect(True)
         self.root.attributes("-alpha", 0.85)
 
-        self.width = 320
+        self.width = 420
         self.height = 60
         screen_w = self.root.winfo_screenwidth()
         screen_h = self.root.winfo_screenheight()
@@ -59,7 +59,7 @@ class VolumeOverlay:
         self.root.configure(bg="#1e1e2e")
 
         self.status_label = tk.Label(
-            self.root, text="TalkRefine", font=("Microsoft YaHei UI", 11),
+            self.root, text="TalkRefine", font=("Microsoft YaHei UI", 10),
             fg="#cdd6f4", bg="#1e1e2e"
         )
         self.status_label.pack(pady=(6, 2))

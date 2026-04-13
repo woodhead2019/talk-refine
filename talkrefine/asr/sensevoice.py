@@ -28,8 +28,11 @@ class SenseVoiceEngine(ASREngine):
         if self._model is None:
             raise RuntimeError("Model not loaded. Call load() first.")
 
-        lang = language if language != "auto" else "zh"
-        result = self._model.generate(input=audio_path, language=lang, use_itn=True)
+        lang = language if language != "auto" else None
+        kwargs = {"input": audio_path, "use_itn": True}
+        if lang:
+            kwargs["language"] = lang
+        result = self._model.generate(**kwargs)
         text = result[0]["text"] if result else ""
         return self._clean_tags(text)
 

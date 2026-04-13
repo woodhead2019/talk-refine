@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
+PROMPTS_DIR = Path(__file__).parent.parent.parent / "prompts"
 
 
 def load_prompt(name_or_path: str) -> str:
@@ -29,7 +29,7 @@ def load_prompt(name_or_path: str) -> str:
 
     # Hardcoded fallback
     return (
-        "Convert the following speech transcription into clean written text. "
-        "Remove filler words and repetition. Output only the result.\n\n"
-        "Raw text: {text}"
+        "请将以下语音识别文本转换为干净的书面语。"
+        "删除口水词和重复内容，只输出结果。\n\n"
+        "原始文本：{text}"
     )

@@ -32,6 +32,7 @@ _STRINGS = {
         "tab_llm": "LLM 润色",
         "tab_output": "输出",
         "ui_language": "界面语言",
+        "autostart": "开机自动启动",
         "record_hotkey": "录音快捷键",
         "cancel_key": "取消快捷键",
         "recognition_lang": "识别语言",
@@ -85,6 +86,7 @@ _STRINGS = {
         "tab_llm": "LLM Refinement",
         "tab_output": "Output",
         "ui_language": "UI Language",
+        "autostart": "Start on system boot",
         "record_hotkey": "Record Hotkey",
         "cancel_key": "Cancel Key",
         "recognition_lang": "Recognition Language",
@@ -185,6 +187,24 @@ def detect_devices() -> list[str]:
     return devices
 
 
+def is_autostart_enabled() -> bool:
+    """Check if TalkRefine is in Windows startup registry."""
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                             r"Software\Microsoft\Windows\CurrentVersion\Run",
+                             0, winreg.KEY_READ)
+        try:
+            winreg.QueryValueEx(key, "TalkRefine")
+            winreg.CloseKey(key)
+            return True
+        except FileNotFoundError:
+            winreg.CloseKey(key)
+            return False
+    except Exception:
+        return False
+
+
 def discover_ollama_models() -> list[str]:
     """Run ``ollama list`` and return model names."""
     try:
@@ -259,10 +279,10 @@ class SettingsWindow:
 
         self.win = tk.Toplevel()
         self.win.title(self.s["settings_title"])
-        self.win.geometry("700x800")
+        self.win.geometry("750x850")
         self.win.attributes("-topmost", True)
         self.win.resizable(True, True)
-        self.win.minsize(650, 750)
+        self.win.minsize(700, 800)
 
         style = ttk.Style(self.win)
         style.configure("TNotebook.Tab", font=_FONT, padding=[14, 5])
@@ -279,6 +299,9 @@ class SettingsWindow:
         self._build_asr_tab(notebook)
         self._build_llm_tab(notebook)
         self._build_output_tab(notebook)
+
+        # Auto-load Ollama models on startup
+        self.win.after(500, self._refresh_ollama_models)
 
         # Bottom buttons
         btn_frame = ttk.Frame(self.win)
@@ -309,7 +332,7 @@ class SettingsWindow:
         ui_lang_combo.grid(row=0, column=1, sticky="w", padx=8, pady=4)
         self.ui_lang_note = ttk.Label(lang_frame, text="", foreground="gray")
         self.ui_lang_note.grid(row=1, column=0, columnspan=2, sticky="w", padx=8)
-        ui_lang_combo.bind("<<ComboboxSelected>>", self._on_ui_lang_change)
+        # Language change takes effect after save & restart
 
         # Hotkeys
         hk_frame = ttk.LabelFrame(tab, text=f"⌨️ {self.s['record_hotkey']}", padding=10)
@@ -349,6 +372,12 @@ class SettingsWindow:
                             value=code).pack(side="left", padx=6)
 
         self._check_hotkey_conflict()
+
+        # ── Autostart ──
+        self.autostart_var = tk.BooleanVar(value=is_autostart_enabled())
+        ttk.Checkbutton(tab, text=self.s["autostart"],
+                        variable=self.autostart_var, style="TCheckbutton").pack(
+            anchor="w", padx=12, pady=(8, 0))
 
     def _on_ui_lang_change(self, _event=None):
         self.ui_lang_note.configure(text=self.s["lang_change_note"])
@@ -633,6 +662,15 @@ class SettingsWindow:
             messagebox.showerror("Error", str(exc), parent=self.win)
             return
 
+        # Handle autostart toggle
+        try:
+            from talkrefine.platform import windows as plat
+            plat.setup_autostart(self.autostart_var.get())
+            if self.autostart_var.get():
+                plat.create_start_menu_shortcut()
+        except Exception:
+            pass
+
         messagebox.showinfo(self.s["save_success"], self.s["save_msg"],
                             parent=self.win)
         self.win.destroy()
@@ -665,12 +703,14 @@ class HistoryWindow:
             return
 
         self._show_all = True
+        self._filter_text = ""
+        self.tree = None
         self.win = tk.Toplevel()
         self.win.title(self.s["history_title"])
-        self.win.geometry("950x800")
+        self.win.geometry("950x900")
         self.win.attributes("-topmost", True)
         self.win.resizable(True, True)
-        self.win.minsize(850, 700)
+        self.win.minsize(850, 800)
 
         # Toolbar
         toolbar = ttk.Frame(self.win, padding=8)
@@ -728,12 +768,12 @@ class HistoryWindow:
 
         # Detail panel- two separate text areas
         detail_frame = ttk.Frame(self.win, padding=(10, 0, 10, 10))
-        detail_frame.pack(fill="both", expand=False)
+        detail_frame.pack(fill="both", expand=True)
 
         # Raw text area
         raw_label_frame = ttk.LabelFrame(detail_frame,
             text=self.s["raw_col"], padding=4)
-        raw_label_frame.pack(fill="x", pady=(0, 4))
+        raw_label_frame.pack(fill="both", expand=True, pady=(0, 4))
         self.raw_text = tk.Text(raw_label_frame, height=5, wrap="word", font=_FONT,
                                 state="normal", cursor="arrow")
         self.raw_text.pack(fill="x")
@@ -744,7 +784,7 @@ class HistoryWindow:
         # Refined text area
         refined_label_frame = ttk.LabelFrame(detail_frame,
             text=self.s["refined_col"], padding=4)
-        refined_label_frame.pack(fill="x")
+        refined_label_frame.pack(fill="both", expand=True)
         self.refined_text = tk.Text(refined_label_frame, height=5, wrap="word",
                                     font=_FONT, state="normal", cursor="arrow")
         self.refined_text.pack(fill="x")
@@ -789,6 +829,8 @@ class HistoryWindow:
         self._populate_tree()
 
     def _populate_tree(self):
+        if self.tree is None:
+            return
         self.tree.delete(*self.tree.get_children())
         for entry in self.history_data:
             raw = entry.get("raw", "")
