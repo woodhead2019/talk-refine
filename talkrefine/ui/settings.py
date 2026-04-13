@@ -146,6 +146,28 @@ _ASR_OPTIONS = [
     ("whisper", "large-v3", "Whisper - large-v3"),
 ]
 
+
+def _check_asr_availability() -> dict[str, bool]:
+    """Check which ASR engines are installed."""
+    available = {}
+    try:
+        import funasr  # noqa: F401
+        available["sensevoice"] = True
+    except ImportError:
+        available["sensevoice"] = False
+    try:
+        import whisper  # noqa: F401
+        available["whisper"] = True
+    except ImportError:
+        available["whisper"] = False
+    return available
+
+
+_ASR_INSTALL_HINT = {
+    "sensevoice": "pip install funasr modelscope",
+    "whisper": "pip install openai-whisper",
+}
+
 # ── Prompt presets ──
 
 _PROMPT_PRESETS = {
@@ -279,10 +301,17 @@ class SettingsWindow:
 
         self.win = tk.Toplevel()
         self.win.title(self.s["settings_title"])
-        self.win.geometry("750x850")
+        self.win.geometry("850x850")
         self.win.attributes("-topmost", True)
         self.win.resizable(True, True)
-        self.win.minsize(700, 800)
+        self.win.minsize(800, 800)
+        # Set window icon
+        try:
+            ico_path = Path(__file__).parent.parent.parent / "talkrefine.ico"
+            if ico_path.exists():
+                self.win.iconbitmap(str(ico_path))
+        except Exception:
+            pass
 
         style = ttk.Style(self.win)
         style.configure("TNotebook.Tab", font=_FONT, padding=[14, 5])
@@ -399,13 +428,18 @@ class SettingsWindow:
         cur_engine = asr.get("engine", "sensevoice")
         cur_model = asr.get("model", "iic/SenseVoiceSmall")
 
-        # Build display labels (add recommendation tag to sensevoice)
+        # Check which engines are installed
+        avail = _check_asr_availability()
+
+        # Build display labels with availability status
         display_values: list[str] = []
         current_display = ""
         for engine, model, label in _ASR_OPTIONS:
             disp = label
             if engine == "sensevoice":
                 disp += f" ({self.s['recommended_cn']})"
+            if not avail.get(engine, False):
+                disp += " ⚠️"
             display_values.append(disp)
             if engine == cur_engine and model == cur_model:
                 current_display = disp
@@ -421,10 +455,18 @@ class SettingsWindow:
         ttk.Label(frame, text=self.s["asr_model"] + ":").grid(
             row=0, column=0, sticky="w", padx=8, pady=4)
         self.asr_combo_var = tk.StringVar(value=current_display)
-        ttk.Combobox(frame, textvariable=self.asr_combo_var,
+        self.asr_combo = ttk.Combobox(frame, textvariable=self.asr_combo_var,
                      values=display_values, width=42,
-                     state="readonly", font=_FONT).grid(
-            row=0, column=1, sticky="w", padx=8, pady=4)
+                     state="readonly", font=_FONT)
+        self.asr_combo.grid(row=0, column=1, sticky="w", padx=8, pady=4)
+
+        # Install hint label
+        self.asr_install_hint = ttk.Label(frame, text="", foreground="gray",
+                                           font=_FONT_SMALL)
+        self.asr_install_hint.grid(row=1, column=0, columnspan=2,
+                                    sticky="w", padx=8)
+        self.asr_combo.bind("<<ComboboxSelected>>", self._on_asr_select)
+        self._on_asr_select()  # show hint for current selection
 
         # Device
         devices = detect_devices()
@@ -439,6 +481,17 @@ class SettingsWindow:
         ttk.Combobox(frame, textvariable=self.asr_device_var,
                      values=devices, width=14, state=state, font=_FONT).grid(
             row=1, column=1, sticky="w", padx=8, pady=4)
+
+    def _on_asr_select(self, _event=None):
+        """Show install hint if selected ASR engine is not installed."""
+        engine, _ = self._parse_asr_selection()
+        avail = _check_asr_availability()
+        if not avail.get(engine, False):
+            hint = _ASR_INSTALL_HINT.get(engine, "")
+            self.asr_install_hint.configure(
+                text=f"⚠️ Not installed. Run: {hint}", foreground="red")
+        else:
+            self.asr_install_hint.configure(text="✅ Installed", foreground="green")
 
     def _parse_asr_selection(self) -> tuple[str, str]:
         """Extract (engine, model) from the combined ASR combobox value."""
@@ -484,11 +537,12 @@ class SettingsWindow:
         ep_inner.grid(row=1, column=1, sticky="ew", padx=8, pady=4)
         self.llm_endpoint_var = tk.StringVar(
             value=llm.get("endpoint", "http://localhost:11434"))
-        ttk.Entry(ep_inner, textvariable=self.llm_endpoint_var, width=28,
+        ttk.Entry(ep_inner, textvariable=self.llm_endpoint_var, width=35,
                   font=_FONT).pack(side="left")
-        ttk.Button(ep_inner, text=f"🔍 {self.s['detect']}", width=10,
+        ttk.Button(ep_inner, text=f"🔍 {self.s['detect']}", width=8,
                    command=self._detect_endpoint).pack(side="left", padx=4)
-        self.endpoint_status = ttk.Label(ep_inner, text="", foreground="green")
+        self.endpoint_status = ttk.Label(ep_inner, text="", foreground="green",
+                                          font=_FONT)
         self.endpoint_status.pack(side="left", padx=4)
 
         # API key (openai only)
@@ -707,10 +761,16 @@ class HistoryWindow:
         self.tree = None
         self.win = tk.Toplevel()
         self.win.title(self.s["history_title"])
-        self.win.geometry("950x900")
+        self.win.geometry("950x1050")
         self.win.attributes("-topmost", True)
         self.win.resizable(True, True)
-        self.win.minsize(850, 800)
+        self.win.minsize(850, 950)
+        try:
+            ico_path = Path(__file__).parent.parent.parent / "talkrefine.ico"
+            if ico_path.exists():
+                self.win.iconbitmap(str(ico_path))
+        except Exception:
+            pass
 
         # Toolbar
         toolbar = ttk.Frame(self.win, padding=8)

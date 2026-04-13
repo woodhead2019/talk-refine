@@ -154,7 +154,25 @@ class TalkRefineApp:
 
         # Update UI language
         from talkrefine.ui.overlay import get_overlay_strings
-        self.os = get_overlay_strings(new_config.get("ui_language", "zh"))
+        ui_lang = new_config.get("ui_language", "zh")
+        self.os = get_overlay_strings(ui_lang)
+
+        # Update settings window config + language for next open
+        if self._settings_win:
+            self._settings_win.config = new_config
+            from talkrefine.ui.settings import _STRINGS
+            if ui_lang in _STRINGS:
+                self._settings_win.s = _STRINGS[ui_lang]
+
+        # Update tray language
+        if self.tray:
+            from talkrefine.ui.tray import _TRAY_STRINGS
+            self.tray._s = _TRAY_STRINGS.get(ui_lang, _TRAY_STRINGS["zh"])
+
+        # Update history window language
+        if self._history_win:
+            if ui_lang in _STRINGS:
+                self._history_win.s = _STRINGS[ui_lang]
 
         # Re-register hotkeys if changed
         import keyboard
@@ -336,23 +354,24 @@ class TalkRefineApp:
             time.sleep(0.3)
             os._exit(0)
 
-        settings_win = None
-        history_win = None
+        self._settings_win = None
+        self._history_win = None
 
         if self.config["ui"]["tray_icon"]:
             from talkrefine.ui.tray import TrayIcon
             from talkrefine.ui.settings import SettingsWindow, HistoryWindow
 
-            settings_win = SettingsWindow(self.config, on_save=self.reload_config)
-            history_win = HistoryWindow()
+            ui_lang = self.config.get("ui_language", "zh")
+            self._settings_win = SettingsWindow(self.config, on_save=self.reload_config)
+            self._history_win = HistoryWindow(lang=ui_lang)
 
             self.tray = TrayIcon(
                 hotkey=hotkey,
                 on_quit=on_quit,
                 on_toggle_llm=lambda v: print(
                     f"LLM: {'✅ on' if v else '❌ off'}"),
-                on_open_settings=lambda: settings_win.show(),
-                on_open_history=lambda: history_win.show(),
+                on_open_settings=lambda: self._settings_win.show(),
+                on_open_history=lambda: self._history_win.show(),
                 tk_root=self.overlay.root if self.overlay else None,
                 ui_language=self.config.get("ui_language", "zh"),
             )

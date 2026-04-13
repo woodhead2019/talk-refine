@@ -96,6 +96,11 @@ def create_start_menu_shortcut():
         sc.WorkingDirectory = scripts_dir
         sc.Description = "TalkRefine - Voice to refined text"
         sc.WindowStyle = 7
+        # Set icon
+        project_root = os.path.dirname(scripts_dir)
+        ico_path = os.path.join(project_root, "talkrefine.ico")
+        if os.path.exists(ico_path):
+            sc.IconLocation = ico_path
         sc.Save()
         return shortcut_path
     except Exception as e:

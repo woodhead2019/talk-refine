@@ -4,6 +4,7 @@ import threading
 import tkinter as tk
 import pystray
 from PIL import Image, ImageDraw
+from talkrefine.ui.icon import create_app_icon
 
 from talkrefine.history import load_recent
 
@@ -158,7 +159,7 @@ class TrayIcon:
             pystray.MenuItem("退出", lambda icon, item: self._quit()),
         )
 
-        self._icon = pystray.Icon("talkrefine", _create_icon_image(),
+        self._icon = pystray.Icon("talkrefine", create_app_icon(128),
                                    "TalkRefine", menu)
         self._icon.run_detached()
 
