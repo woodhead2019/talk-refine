@@ -6,17 +6,29 @@ import time
 import threading
 
 
+_hotkey_manager = None
+
+
 def register_hotkey(key: str, callback):
-    """Register a global hotkey."""
-    import keyboard
-    keyboard.add_hotkey(key, callback, suppress=False)
+    """Register a global hotkey (uses Win32 API, survives lock/unlock)."""
+    global _hotkey_manager
+    if _hotkey_manager is None:
+        from talkrefine.platform.hotkeys import HotkeyManager
+        _hotkey_manager = HotkeyManager()
+    _hotkey_manager.register(key, callback)
+
+
+def start_hotkey_listener():
+    """Start the hotkey message loop. Call after all register_hotkey() calls."""
+    if _hotkey_manager:
+        _hotkey_manager.start()
 
 
 def wait_forever():
     """Block the current thread until interrupted."""
-    import keyboard
     try:
-        keyboard.wait()
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
         pass
 

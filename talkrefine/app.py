@@ -219,15 +219,11 @@ class TalkRefineApp:
                 self._history_win.s = _STRINGS[ui_lang]
 
         # Re-register hotkeys if changed
-        import keyboard
         new_hotkey = new_config["hotkey"]
         new_cancel = new_config.get("cancel_key", "esc")
         if new_hotkey != old_hotkey or new_cancel != old_cancel:
-            keyboard.unhook_all_hotkeys()
-            from talkrefine.platform import windows as plat
-            plat.register_hotkey(new_hotkey, self.toggle_recording)
-            plat.register_hotkey(new_cancel, self.cancel_recording)
-            logger.info("🔄 Hotkeys updated: %s / %s", new_hotkey.upper(), new_cancel.upper())
+            logger.info("⚠️  Hotkey changed to %s / %s — restart needed to apply",
+                        new_hotkey.upper(), new_cancel.upper())
 
         # Recreate LLM provider
         self.llm = _create_llm_provider(new_config)
@@ -433,6 +429,7 @@ class TalkRefineApp:
         from talkrefine.platform import windows as plat
         plat.register_hotkey(hotkey, self.toggle_recording)
         plat.register_hotkey(cancel_key, self.cancel_recording)
+        plat.start_hotkey_listener()
         logger.info("💡 Right-click tray icon to quit\n")
 
         # 4. Load models in background thread
