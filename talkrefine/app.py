@@ -488,6 +488,17 @@ class TalkRefineApp:
 def main():
     setup_logging()
 
+    # Log unhandled exceptions (critical for pythonw where stderr is hidden)
+    def _excepthook(exc_type, exc_value, exc_tb):
+        logger.critical("Unhandled exception", exc_info=(exc_type, exc_value, exc_tb))
+    sys.excepthook = _excepthook
+
+    # Also catch unhandled exceptions in threads
+    def _thread_excepthook(args):
+        logger.critical("Unhandled thread exception in %s",
+                        args.thread, exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
+    threading.excepthook = _thread_excepthook
+
     parser = argparse.ArgumentParser(
         prog="talkrefine",
         description="TalkRefine - Local voice input with LLM refinement",
@@ -530,8 +541,12 @@ def main():
         ctypes.windll.kernel32.CloseHandle(mutex)
         return
 
-    app = TalkRefineApp(config)
-    app.run()
+    try:
+        app = TalkRefineApp(config)
+        app.run()
+    except Exception:
+        logger.exception("❌ Fatal error")
+        raise
 
 
 if __name__ == "__main__":
