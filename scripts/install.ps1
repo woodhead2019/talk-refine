@@ -205,7 +205,7 @@ if ($installPython) {
 
     # Verify critical packages
     $missing = @()
-    foreach ($pkg in @("pyaudio", "funasr", "torch", "yaml", "keyboard", "pystray", "PIL")) {
+    foreach ($pkg in @("pyaudio", "funasr", "torch", "yaml", "pystray", "PIL")) {
         python -c "import $pkg" 2>&1 | Out-Null
         if ($LASTEXITCODE -ne 0) { $missing += $pkg }
     }

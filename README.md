@@ -54,7 +54,7 @@ ollama pull qwen3.5:2b
 
 # 2. 安装 Python 包
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-pip install funasr modelscope pyaudio pyperclip pyautogui keyboard requests pystray Pillow pyyaml
+pip install funasr modelscope pyaudio pyperclip pyautogui requests pystray Pillow pyyaml
 
 # 3. 运行
 python -m talkrefine
