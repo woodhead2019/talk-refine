@@ -4,6 +4,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectDir = Split-Path -Parent $scriptDir
 
 Write-Host ""
 Write-Host "  ========================================" -ForegroundColor Cyan
@@ -32,6 +34,72 @@ if ($Uninstall) {
     Write-Host "  Remove-Item -Recurse ~\.cache\modelscope"
     Write-Host "  winget uninstall Ollama.Ollama  # if no longer needed"
     Write-Host "  winget uninstall Gyan.FFmpeg    # if no longer needed"
+    exit 0
+}
+
+# ── Detect if already installed → update mode ──
+
+function Test-Installed {
+    $ErrorActionPreference = "Continue"
+    $checks = @(
+        (Get-Command python -ErrorAction SilentlyContinue),
+        (Get-Command ffmpeg -ErrorAction SilentlyContinue),
+        (Get-Command ollama -ErrorAction SilentlyContinue)
+    )
+    $pyPkgs = python -c "import funasr, pystray, torch" 2>&1
+    $allPkgs = ($LASTEXITCODE -eq 0)
+    $ErrorActionPreference = "Stop"
+    return ($checks[0] -and $checks[1] -and $checks[2] -and $allPkgs)
+}
+
+$isUpdate = Test-Installed
+if ($isUpdate) {
+    Write-Host "  Existing installation detected!" -ForegroundColor Green
+    Write-Host "  Running in UPDATE mode..." -ForegroundColor Cyan
+    Write-Host ""
+
+    # 1. Git pull
+    Write-Host "[1/3] Updating code..." -ForegroundColor Cyan
+    Push-Location $projectDir
+    $ErrorActionPreference = "Continue"
+    git pull 2>&1
+    $ErrorActionPreference = "Stop"
+    Pop-Location
+    Write-Host "  [OK] Code updated" -ForegroundColor Green
+
+    # 2. Kill running instance
+    Write-Host "[2/3] Restarting TalkRefine..." -ForegroundColor Cyan
+    $procs = Get-Process python* -ErrorAction SilentlyContinue
+    if ($procs) {
+        $procs | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+        Start-Sleep 2
+        Write-Host "  [OK] Old process stopped" -ForegroundColor Green
+    }
+
+    # 3. Reinstall shortcuts (in case icon/paths changed)
+    Push-Location $projectDir
+    $venvActivate = Join-Path $projectDir "venv\Scripts\Activate.ps1"
+    if (Test-Path $venvActivate) { & $venvActivate }
+    $ErrorActionPreference = "Continue"
+    python -m talkrefine --install 2>&1 | Out-Null
+    $ErrorActionPreference = "Stop"
+    Pop-Location
+
+    # 4. Restart
+    $vbs = Join-Path $projectDir "scripts\start_hidden.vbs"
+    wscript.exe $vbs
+    Start-Sleep 3
+    $running = Get-Process python* -ErrorAction SilentlyContinue
+    if ($running) {
+        Write-Host "  [OK] TalkRefine restarted" -ForegroundColor Green
+    } else {
+        Write-Host "  [WARN] TalkRefine may not have started. Try manually." -ForegroundColor Yellow
+    }
+
+    Write-Host ""
+    Write-Host "  ========================================" -ForegroundColor Green
+    Write-Host "  Update complete!" -ForegroundColor Green
+    Write-Host "  ========================================" -ForegroundColor Green
     exit 0
 }
 
