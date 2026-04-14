@@ -128,6 +128,7 @@ class TalkRefineApp:
         self.overlay = None
         self.tray = None
         self._models_ready = False
+        self._processing = False  # Lock to prevent re-entry during ASR/LLM
         # Load overlay UI strings based on config
         ui_lang = config.get("ui_language", "zh")
         from talkrefine.ui.overlay import get_overlay_strings
@@ -172,10 +173,21 @@ class TalkRefineApp:
                 self.overlay.show("⏳ Model still loading...")
                 self.overlay.schedule_hide(2000)
             return
+        if self._processing:
+            logger.info("⏳ Still processing previous recording, ignoring")
+            return
         if not self.recorder.recording:
             self._start_recording()
         else:
-            threading.Thread(target=self._stop_and_process, daemon=True).start()
+            self._processing = True
+            threading.Thread(target=self._stop_and_process_safe, daemon=True).start()
+
+    def _stop_and_process_safe(self):
+        """Wrapper that ensures _processing flag is cleared."""
+        try:
+            self._stop_and_process()
+        finally:
+            self._processing = False
 
     def cancel_recording(self):
         if not self.recorder.recording:
