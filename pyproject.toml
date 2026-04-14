@@ -28,7 +28,6 @@ dependencies = [
     "pyaudio",
     "pyperclip",
     "pyautogui",
-    "keyboard",
     "requests",
     "pystray",
     "Pillow",

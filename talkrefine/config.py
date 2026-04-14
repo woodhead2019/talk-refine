@@ -5,7 +5,7 @@ import copy
 from pathlib import Path
 
 DEFAULTS = {
-    "hotkey": "f6",
+    "hotkey": "f8",
     "cancel_key": "esc",
     "language": "auto",
     "ui_language": "zh",

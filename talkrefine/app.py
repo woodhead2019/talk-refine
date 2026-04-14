@@ -7,6 +7,9 @@ import time
 import tempfile
 import threading
 import argparse
+import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 # Windows DPI awareness (must be before tkinter)
 import ctypes
@@ -31,6 +34,33 @@ except Exception:
 
 from talkrefine import __version__
 from talkrefine.config import load_config
+
+logger = logging.getLogger("talkrefine")
+
+
+def setup_logging():
+    log_dir = Path.home() / ".talkrefine"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "talkrefine.log"
+
+    logger.setLevel(logging.INFO)
+
+    # File handler with rotation
+    fh = RotatingFileHandler(
+        log_file, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
+    fh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    logger.addHandler(fh)
+
+    # Console handler (stdout) - only if stdout exists
+    try:
+        if sys.stdout and hasattr(sys.stdout, "write"):
+            ch = logging.StreamHandler(sys.stdout)
+            ch.setFormatter(logging.Formatter("%(message)s"))
+            logger.addHandler(ch)
+    except Exception:
+        pass
+
+    return logger
 
 
 def _create_asr_engine(config: dict):
@@ -97,6 +127,8 @@ class TalkRefineApp:
         self.prompt_template = ""
         self.overlay = None
         self.tray = None
+        self._models_ready = False
+        self._processing = False  # Lock to prevent re-entry during ASR/LLM
         # Load overlay UI strings based on config
         ui_lang = config.get("ui_language", "zh")
         from talkrefine.ui.overlay import get_overlay_strings
@@ -104,16 +136,18 @@ class TalkRefineApp:
 
     def init_models(self):
         """Load ASR model and LLM provider."""
-        print("⏳ Loading ASR model...")
+        logger.info("⏳ Loading ASR model...")
         if self.overlay:
             self.overlay.show(self.os["loading"])
 
+        t0 = time.time()
         self.asr = _create_asr_engine(self.config)
         self.asr.load()
-        print(f"✅ ASR: {self.asr.name}")
+        logger.info("✅ ASR: %s (loaded in %.1fs)", self.asr.name, time.time() - t0)
 
+        t0 = time.time()
         self.llm = _create_llm_provider(self.config)
-        print(f"✅ LLM: {self.llm.name}")
+        logger.info("✅ LLM: %s (loaded in %.1fs)", self.llm.name, time.time() - t0)
 
         from talkrefine.llm.prompts import load_prompt
         prompt_cfg = self.config["llm"]
@@ -123,8 +157,10 @@ class TalkRefineApp:
         else:
             self.prompt_template = load_prompt(prompt_cfg["prompt"])
 
+        self._models_ready = True
+
         hotkey = self.config["hotkey"].upper()
-        print(f"\n🟢 Ready! Press [{hotkey}] to record")
+        logger.info("\n🟢 Ready! Press [%s] to record", hotkey)
 
         if self.overlay:
             self.overlay.set_status(
@@ -132,16 +168,32 @@ class TalkRefineApp:
             self.overlay.schedule_hide(2000)
 
     def toggle_recording(self):
+        if not self._models_ready:
+            if self.overlay:
+                self.overlay.show("⏳ Model still loading...")
+                self.overlay.schedule_hide(2000)
+            return
+        if self._processing:
+            logger.info("⏳ Still processing previous recording, ignoring")
+            return
         if not self.recorder.recording:
             self._start_recording()
         else:
-            threading.Thread(target=self._stop_and_process, daemon=True).start()
+            self._processing = True
+            threading.Thread(target=self._stop_and_process_safe, daemon=True).start()
+
+    def _stop_and_process_safe(self):
+        """Wrapper that ensures _processing flag is cleared."""
+        try:
+            self._stop_and_process()
+        finally:
+            self._processing = False
 
     def cancel_recording(self):
         if not self.recorder.recording:
             return
         self.recorder.stop()
-        print("🚫 Recording cancelled")
+        logger.info("🚫 Recording cancelled")
         if self.overlay:
             self.overlay.set_status(self.os["cancelled"], "#f9e2af")
             self.overlay.schedule_hide(1500)
@@ -179,19 +231,15 @@ class TalkRefineApp:
                 self._history_win.s = _STRINGS[ui_lang]
 
         # Re-register hotkeys if changed
-        import keyboard
         new_hotkey = new_config["hotkey"]
         new_cancel = new_config.get("cancel_key", "esc")
         if new_hotkey != old_hotkey or new_cancel != old_cancel:
-            keyboard.unhook_all_hotkeys()
-            from talkrefine.platform import windows as plat
-            plat.register_hotkey(new_hotkey, self.toggle_recording)
-            plat.register_hotkey(new_cancel, self.cancel_recording)
-            print(f"🔄 Hotkeys updated: {new_hotkey.upper()} / {new_cancel.upper()}")
+            logger.info("⚠️  Hotkey changed to %s / %s — restart needed to apply",
+                        new_hotkey.upper(), new_cancel.upper())
 
         # Recreate LLM provider
         self.llm = _create_llm_provider(new_config)
-        print(f"🔄 LLM: {self.llm.name}")
+        logger.info("🔄 LLM: %s", self.llm.name)
 
         # Reload prompt
         prompt_cfg = new_config["llm"]
@@ -203,18 +251,36 @@ class TalkRefineApp:
 
         # ASR model change requires restart
         if new_asr != old_asr:
-            print("⚠️  ASR model changed, restart required")
+            logger.info("⚠️  ASR model changed, restart required")
         else:
-            print("✅ Config applied (no restart needed)")
+            logger.info("✅ Config applied (no restart needed)")
 
     def _start_recording(self):
         self.recorder.start()
         hotkey = self.config["hotkey"].upper()
         cancel = self.config.get("cancel_key", "esc").upper()
-        print(f"🎙️  Recording...")
+        logger.info("🎙️  Recording...")
         if self.overlay:
             text = self.os["recording"].format(hotkey=hotkey, cancel=cancel)
             self.overlay.show(text)
+
+        # Poll cancel key (ESC) during recording — not registered globally
+        cancel_key = self.config.get("cancel_key", "esc")
+        from talkrefine.platform.hotkeys import _parse_key
+        _, cancel_vk = _parse_key(cancel_key)
+
+        def poll_cancel():
+            import ctypes
+            import time
+            user32 = ctypes.windll.user32
+            while self.recorder.recording:
+                # GetAsyncKeyState returns negative if key is pressed
+                if user32.GetAsyncKeyState(cancel_vk) & 0x8000:
+                    self.cancel_recording()
+                    break
+                time.sleep(0.1)
+
+        threading.Thread(target=poll_cancel, daemon=True).start()
 
     def _stop_and_process(self):
         from talkrefine.recorder import SAMPLE_RATE, CHANNELS
@@ -229,7 +295,7 @@ class TalkRefineApp:
             self._show_warning(self.os["too_short"])
             return
 
-        print(f"⏳ {duration:.1f}s recorded, recognizing...")
+        logger.info("⏳ %.1fs recorded, recognizing...", duration)
         if self.overlay:
             self.overlay.set_status(self.os["recognizing"], "#89b4fa")
 
@@ -244,7 +310,9 @@ class TalkRefineApp:
 
         try:
             # ASR
+            t0 = time.time()
             raw_text = self.asr.transcribe(tmp_path, self.config["language"])
+            asr_time = time.time() - t0
             # Skip if empty or only punctuation
             import re
             cleaned = re.sub(r'[\s。，、！？,.!?\-—…]+', '', raw_text or '')
@@ -252,7 +320,7 @@ class TalkRefineApp:
                 self._show_warning(self.os["no_speech"])
                 return
 
-            print(f"📝 Raw: {raw_text}")
+            logger.info("📝 Raw (ASR %.1fs): %s", asr_time, raw_text)
 
             # LLM refinement
             if self.config["llm"]["enabled"] and self.tray and not self.tray.llm_enabled:
@@ -260,11 +328,15 @@ class TalkRefineApp:
             elif self.config["llm"]["enabled"]:
                 if self.overlay:
                     self.overlay.set_status(self.os["refining"], "#cba6f7")
+                t0 = time.time()
                 final_text = self.llm.refine(raw_text, self.prompt_template)
+                logger.info("✨ Result (LLM %.1fs): %s", time.time() - t0, final_text)
             else:
                 final_text = raw_text
 
-            print(f"✨ Result: {final_text}")
+            if not self.config["llm"]["enabled"] or \
+                    (self.tray and not self.tray.llm_enabled):
+                logger.info("✨ Result: %s", final_text)
 
             # Save to history
             from talkrefine.history import add_entry
@@ -292,18 +364,16 @@ class TalkRefineApp:
             from talkrefine.platform import windows as plat
             if self.config["output"]["auto_paste"]:
                 plat.paste_text(final_text, self.config["output"]["preserve_clipboard"])
-                print(self.os["pasted"])
+                logger.info(self.os["pasted"])
             else:
                 plat.copy_text(final_text)
-                print(self.os["copied"])
+                logger.info(self.os["copied"])
 
             if self.overlay:
                 self.overlay.schedule_hide(3000)
 
         except Exception as e:
-            print(f"❌ Error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.exception("❌ Error: %s", e)
             if self.overlay:
                 self.overlay.set_status(self.os["error"], "#f38ba8")
                 self.overlay.schedule_hide(3000)
@@ -314,7 +384,7 @@ class TalkRefineApp:
                 pass
 
     def _show_warning(self, msg: str):
-        print(f"⚠️  {msg}")
+        logger.info("⚠️  %s", msg)
         if self.overlay:
             self.overlay.set_status(f"⚠️ {msg}", "#f38ba8")
             self.overlay.schedule_hide(2000)
@@ -324,23 +394,25 @@ class TalkRefineApp:
         hotkey = self.config["hotkey"]
         cancel_key = self.config.get("cancel_key", "esc")
 
-        print("=" * 50)
-        print("  🎤 TalkRefine")
-        print("=" * 50)
-        print(f"  Record:       [{hotkey.upper()}] (toggle)")
-        print(f"  Cancel:       [{cancel_key.upper()}]")
-        print(f"  ASR engine:   {self.config['asr']['engine']}"
-              f" ({self.config['asr']['model']})")
-        print(f"  LLM:          {self.config['llm']['provider']}"
-              f" / {self.config['llm']['model']}"
-              f" ({'on' if self.config['llm']['enabled'] else 'off'})")
-        print(f"  Prompt:       {self.config['llm']['prompt']}")
-        print(f"  Language:     {self.config['language']}")
-        print(f"  Auto-paste:   {'✅' if self.config['output']['auto_paste'] else '❌'}")
-        print(f"  Keep clipboard: {'✅' if self.config['output']['preserve_clipboard'] else '❌'}")
-        print("=" * 50)
+        logger.info("=" * 50)
+        logger.info("  🎤 TalkRefine")
+        logger.info("=" * 50)
+        logger.info("  Record:       [%s] (toggle)", hotkey.upper())
+        logger.info("  Cancel:       [%s]", cancel_key.upper())
+        logger.info("  ASR engine:   %s (%s)",
+                     self.config["asr"]["engine"], self.config["asr"]["model"])
+        logger.info("  LLM:          %s / %s (%s)",
+                     self.config["llm"]["provider"], self.config["llm"]["model"],
+                     "on" if self.config["llm"]["enabled"] else "off")
+        logger.info("  Prompt:       %s", self.config["llm"]["prompt"])
+        logger.info("  Language:     %s", self.config["language"])
+        logger.info("  Auto-paste:   %s",
+                     "✅" if self.config["output"]["auto_paste"] else "❌")
+        logger.info("  Keep clipboard: %s",
+                     "✅" if self.config["output"]["preserve_clipboard"] else "❌")
+        logger.info("=" * 50)
 
-        # UI: overlay
+        # 1. UI: overlay
         if self.config["ui"]["overlay"]:
             from talkrefine.ui.overlay import VolumeOverlay
             self.overlay = VolumeOverlay()
@@ -354,9 +426,9 @@ class TalkRefineApp:
                     time.sleep(0.05)
             threading.Thread(target=volume_updater, daemon=True).start()
 
-        # UI: tray icon
+        # 2. UI: tray icon
         def on_quit():
-            print("\n👋 Bye!")
+            logger.info("\n👋 Bye!")
             time.sleep(0.3)
             os._exit(0)
 
@@ -374,8 +446,8 @@ class TalkRefineApp:
             self.tray = TrayIcon(
                 hotkey=hotkey,
                 on_quit=on_quit,
-                on_toggle_llm=lambda v: print(
-                    f"LLM: {'✅ on' if v else '❌ off'}"),
+                on_toggle_llm=lambda v: logger.info(
+                    "LLM: %s", "✅ on" if v else "❌ off"),
                 on_open_settings=lambda: self._settings_win.show(),
                 on_open_history=lambda: self._history_win.show(),
                 tk_root=self.overlay.root if self.overlay else None,
@@ -383,28 +455,39 @@ class TalkRefineApp:
             )
             self.tray.start()
 
-        # Init models + register hotkey in background
-        def init_bg():
-            self.init_models()
-            from talkrefine.platform import windows as plat
-            plat.register_hotkey(hotkey, self.toggle_recording)
-            plat.register_hotkey(cancel_key, self.cancel_recording)
-            print("💡 Right-click tray icon to quit\n")
+        # 3. Register hotkeys immediately (before models are loaded)
+        from talkrefine.platform import windows as plat
+        plat.register_hotkey(hotkey, self.toggle_recording)
+        # ESC is NOT registered globally — only polled during recording
+        plat.start_hotkey_listener()
+        logger.info("💡 Right-click tray icon to quit\n")
 
-        threading.Thread(target=init_bg, daemon=True).start()
+        # 4. Load models in background thread
+        def init_models_bg():
+            try:
+                self.init_models()
+            except Exception as e:
+                logger.exception("❌ Model loading failed: %s", e)
+                if self.overlay:
+                    self.overlay.set_status(
+                        f"❌ Model load failed: {e}", "#f38ba8")
+                    self.overlay.schedule_hide(5000)
 
-        # Main loop
+        threading.Thread(target=init_models_bg, daemon=True).start()
+
+        # 5. Main loop
         if self.overlay:
             try:
                 self.overlay.run()
             except KeyboardInterrupt:
                 on_quit()
         else:
-            from talkrefine.platform import windows as plat
             plat.wait_forever()
 
 
 def main():
+    setup_logging()
+
     parser = argparse.ArgumentParser(
         prog="talkrefine",
         description="TalkRefine - Local voice input with LLM refinement",
@@ -422,27 +505,28 @@ def main():
         from talkrefine.platform import windows as plat
         plat.setup_autostart(True)
         result = plat.create_start_menu_shortcut()
-        print("✅ Autostart enabled")
+        logger.info("✅ Autostart enabled")
         if result:
-            print(f"✅ Start Menu shortcut: {result}")
+            logger.info("✅ Start Menu shortcut: %s", result)
         return
 
     if args.uninstall:
         from talkrefine.platform import windows as plat
         plat.setup_autostart(False)
         plat.remove_start_menu_shortcut()
-        print("✅ Autostart removed")
-        print("✅ Start Menu shortcut removed")
+        logger.info("✅ Autostart removed")
+        logger.info("✅ Start Menu shortcut removed")
         return
 
     config = load_config(args.config)
+    logger.info("Config loaded from %s", args.config or "default location")
 
     # Single instance check (Windows named mutex)
     import ctypes
     mutex = ctypes.windll.kernel32.CreateMutexW(None, True, "TalkRefine_SingleInstance")
     if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
-        print("⚠️  TalkRefine 已在运行中，请勿重复启动。")
-        print("   请在系统托盘找到 TalkRefine 图标。")
+        logger.info("⚠️  TalkRefine 已在运行中，请勿重复启动。")
+        logger.info("   请在系统托盘找到 TalkRefine 图标。")
         ctypes.windll.kernel32.CloseHandle(mutex)
         return
 

@@ -1,4 +1,4 @@
-﻿# 🎤 TalkRefine
+# 🎤 TalkRefine
 
 **自然说话，输出精炼文字。** 本地离线语音输入 + LLM 润色工具。
 
@@ -63,9 +63,9 @@ python -m talkrefine
 ## 使用方法
 
 1. 启动（开始菜单搜 `TalkRefine`，或 `python -m talkrefine`）
-2. 按 **F6** 开始录音
+2. 按 **F8** 开始录音
 3. 自然说话
-4. 按 **F6** 停止 → 自动识别、润色、粘贴
+4. 按 **F8** 停止 → 自动识别、润色、粘贴
 5. 按 **ESC** 取消录音（丢弃不处理）
 
 系统托盘图标（右下角）→ 右键菜单：
@@ -77,7 +77,7 @@ python -m talkrefine
 复制 `config.example.yaml` 为 `config.yaml`，按需修改：
 
 ```yaml
-hotkey: "f6"              # 录音快捷键（f9, ctrl+shift+r 等均可）
+hotkey: "F8"              # 录音快捷键（f9, ctrl+shift+r 等均可）
 cancel_key: "esc"         # 取消录音
 language: "auto"          # "auto", "zh", "en", "ja", ...
 

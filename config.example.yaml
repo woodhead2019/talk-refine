@@ -2,7 +2,7 @@
 # Copy this file to config.yaml and customize.
 
 # ── Hotkeys ──────────────────────────────────────
-hotkey: "f6"              # Press to start/stop recording
+hotkey: "f8"              # Press to start/stop recording
 cancel_key: "esc"         # Press to cancel current recording
 
 # ── Language ─────────────────────────────────────
