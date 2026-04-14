@@ -440,8 +440,10 @@ class TalkRefineApp:
             from talkrefine.ui.settings import SettingsWindow, HistoryWindow
 
             ui_lang = self.config.get("ui_language", "zh")
-            self._settings_win = SettingsWindow(self.config, on_save=self.reload_config)
-            self._history_win = HistoryWindow(lang=ui_lang)
+            tk_root = self.overlay.root if self.overlay else None
+            self._settings_win = SettingsWindow(
+                self.config, on_save=self.reload_config, parent=tk_root)
+            self._history_win = HistoryWindow(lang=ui_lang, parent=tk_root)
 
             self.tray = TrayIcon(
                 hotkey=hotkey,
@@ -481,6 +483,9 @@ class TalkRefineApp:
                 self.overlay.run()
             except KeyboardInterrupt:
                 on_quit()
+            else:
+                logger.warning("⚠️  Main loop exited unexpectedly, restarting...")
+                self.overlay.run()
         else:
             plat.wait_forever()
 

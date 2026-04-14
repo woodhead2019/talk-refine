@@ -262,10 +262,11 @@ def _load_prompt_from_config(config: dict) -> str:
 class SettingsWindow:
     """Tab-based configuration settings window with i18n support."""
 
-    def __init__(self, config: dict, on_save=None):
+    def __init__(self, config: dict, on_save=None, parent=None):
         self.config = config
         self.on_save = on_save
         self.win = None
+        self._parent = parent
 
         lang = config.get("ui_language", "zh")
         if lang not in _STRINGS:
@@ -277,12 +278,13 @@ class SettingsWindow:
             self.win.lift()
             return
 
-        self.win = tk.Toplevel()
+        self.win = tk.Toplevel(self._parent)
         self.win.title(self.s["settings_title"])
         self.win.geometry("950x850")
         self.win.attributes("-topmost", True)
         self.win.resizable(True, True)
         self.win.minsize(900, 800)
+        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
         # Set window icon
         try:
             ico_path = Path(__file__).parent.parent.parent / "assets" / "talkrefine.ico"
@@ -316,7 +318,7 @@ class SettingsWindow:
         ttk.Button(btn_frame, text=self.s["save"], width=12,
                    command=self._save).pack(side="right", padx=(5, 0))
         ttk.Button(btn_frame, text=self.s["cancel"], width=10,
-                   command=self.win.destroy).pack(side="right")
+                   command=self._on_close).pack(side="right")
 
     # ────────────── Tab 1: General ──────────────
 
@@ -747,10 +749,16 @@ class SettingsWindow:
 
         messagebox.showinfo(self.s["save_success"], self.s["save_msg"],
                             parent=self.win)
-        self.win.destroy()
+        self._on_close()
 
         if self.on_save:
             self.on_save(new_config)
+
+    def _on_close(self):
+        """Hide settings window without destroying the Tk root."""
+        if self.win:
+            self.win.destroy()
+            self.win = None
 
 
 # ────────────────────────────────────────────────────────────
@@ -760,8 +768,9 @@ class SettingsWindow:
 class HistoryWindow:
     """History viewer window showing all entries by default."""
 
-    def __init__(self, lang: str = "zh"):
+    def __init__(self, lang: str = "zh", parent=None):
         self.win = None
+        self._parent = parent
         self._show_all = True
         self.history_data: list[dict] = []
         self._filter_text = ""
@@ -779,12 +788,13 @@ class HistoryWindow:
         self._show_all = True
         self._filter_text = ""
         self.tree = None
-        self.win = tk.Toplevel()
+        self.win = tk.Toplevel(self._parent)
         self.win.title(self.s["history_title"])
         self.win.geometry("950x1050")
         self.win.attributes("-topmost", True)
         self.win.resizable(True, True)
         self.win.minsize(850, 950)
+        self.win.protocol("WM_DELETE_WINDOW", self._on_close)
         try:
             ico_path = Path(__file__).parent.parent.parent / "assets" / "talkrefine.ico"
             if ico_path.exists():
@@ -975,3 +985,9 @@ class HistoryWindow:
         self._populate_tree()
         self.raw_text.delete("1.0", "end")
         self.refined_text.delete("1.0", "end")
+
+    def _on_close(self):
+        """Hide history window without destroying the Tk root."""
+        if self.win:
+            self.win.destroy()
+            self.win = None
