@@ -356,7 +356,7 @@ if ($installASRModel) {
     $ErrorActionPreference = "Continue"
     python -c "
 from funasr import AutoModel
-model = AutoModel(model='FunAudioLLM/SenseVoiceSmall', trust_remote_code=True, device='cpu', disable_update=True, hub='hf')
+model = AutoModel(model='FunAudioLLM/SenseVoiceSmall', trust_remote_code=False, device='cpu', disable_update=True, hub='hf')
 print('Model downloaded successfully')
 " 2>&1 | Out-Null
     $ErrorActionPreference = "Stop"

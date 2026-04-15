@@ -30,7 +30,7 @@ class SenseVoiceEngine(ASREngine):
             model_id = _MS_TO_HF[model_id]
         self._model = AutoModel(
             model=model_id,
-            trust_remote_code=True,
+            trust_remote_code=False,
             device=self._device,
             disable_update=True,
             hub=self._hub,
