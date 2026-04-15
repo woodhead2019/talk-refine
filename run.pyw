@@ -2,11 +2,14 @@
 import sys
 import os
 
-# Handle encoding for non-UTF-8 environments (startup, pythonw, etc.)
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w")
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w")
+# Handle pythonw.exe: stdout/stderr may be None OR a closed file handle.
+def _ensure_stream(name):
+    stream = getattr(sys, name, None)
+    if stream is None or getattr(stream, "closed", False):
+        setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))
+
+_ensure_stream("stdout")
+_ensure_stream("stderr")
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
