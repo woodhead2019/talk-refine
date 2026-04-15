@@ -293,11 +293,26 @@ class TalkRefineApp:
             from talkrefine.llm.prompts import load_prompt
             self.prompt_template = load_prompt(prompt_cfg["prompt"])
 
-        # ASR model change requires restart
+        # ASR model change → auto-restart
         if new_asr != old_asr:
-            logger.info("⚠️  ASR model changed, restart required")
+            logger.info("🔄 ASR model changed, auto-restarting...")
+            self._auto_restart()
         else:
             logger.info("✅ Config applied (no restart needed)")
+
+    def _auto_restart(self):
+        """Restart the program automatically."""
+        import subprocess
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        vbs_path = os.path.join(project_root, "scripts", "start_hidden.vbs")
+
+        # Launch new instance
+        subprocess.Popen(["wscript.exe", vbs_path])
+        logger.info("🔄 New instance launched, exiting current...")
+
+        # Exit current
+        time.sleep(1)
+        os._exit(0)
 
     def _start_recording(self):
         self.recorder.start()
