@@ -141,14 +141,30 @@ class TalkRefineApp:
         from talkrefine.locale import get_strings
         self.s = get_strings(ui_lang)
 
+
+    def _overlay_show(self, text, color="#a6e3a1"):
+        """Thread-safe overlay show."""
+        if self.overlay:
+            self.overlay.root.after(0, lambda: self.overlay.show(text))
+
+    def _overlay_status(self, text, color="#cdd6f4"):
+        """Thread-safe overlay set_status."""
+        if self.overlay:
+            self.overlay.root.after(0, lambda: self.overlay.set_status(text, color))
+
+    def _overlay_hide(self, delay_ms=3000):
+        """Thread-safe overlay schedule_hide."""
+        if self.overlay:
+            self.overlay.root.after(0, lambda: self.overlay.schedule_hide(delay_ms))
+
     def init_models(self):
         """Load ASR model and LLM provider (called from background thread)."""
         # Update overlay via tkinter thread-safe method
         def _show_status(text, color="#89b4fa"):
             if self.overlay:
                 self.overlay.root.after(0, lambda: (
-                    self.overlay.show(text),
-                    self.overlay.set_status(text, color)
+                    self._overlay_show(text),
+                    self._overlay_status(text, color)
                 ))
 
         _show_status(self.s["loading"])
@@ -201,16 +217,16 @@ class TalkRefineApp:
 
         if self.overlay:
             self.overlay.root.after(0, lambda: (
-                self.overlay.set_status(
+                self._overlay_status(
                     self.s["ready"].format(hotkey=hotkey), "#a6e3a1"),
-                self.overlay.schedule_hide(2000)
+                self._overlay_hide(2000)
             ))
 
     def toggle_recording(self):
         if not self._models_ready:
             if self.overlay:
-                self.overlay.show(self.s["model_not_ready"])
-                self.overlay.schedule_hide(2000)
+                self._overlay_show(self.s["model_not_ready"])
+                self._overlay_hide(2000)
             return
         if self._processing:
             logger.info("⏳ Still processing previous recording, ignoring")
@@ -234,8 +250,8 @@ class TalkRefineApp:
         self.recorder.stop()
         logger.info("🚫 Recording cancelled")
         if self.overlay:
-            self.overlay.set_status(self.s["cancelled"], "#f9e2af")
-            self.overlay.schedule_hide(1500)
+            self._overlay_status(self.s["cancelled"], "#f9e2af")
+            self._overlay_hide(1500)
 
     def reload_config(self, new_config: dict):
         """Hot-reload config. ASR model changes still need restart."""
@@ -324,7 +340,7 @@ class TalkRefineApp:
         logger.info("🎙️  Recording...")
         if self.overlay:
             text = self.s["recording"].format(hotkey=hotkey, cancel=cancel)
-            self.overlay.show(text)
+            self._overlay_show(text)
 
         # Poll cancel key (ESC) during recording — not registered globally
         cancel_key = self.config.get("cancel_key", "esc")
@@ -359,7 +375,7 @@ class TalkRefineApp:
 
         logger.info("⏳ %.1fs recorded, recognizing...", duration)
         if self.overlay:
-            self.overlay.set_status(self.s["recognizing"], "#89b4fa")
+            self._overlay_status(self.s["recognizing"], "#89b4fa")
 
         # Save to temp WAV
         tmp_path = os.path.join(tempfile.gettempdir(),
@@ -389,7 +405,7 @@ class TalkRefineApp:
                 final_text = raw_text
             elif self.config["llm"]["enabled"]:
                 if self.overlay:
-                    self.overlay.set_status(self.s["refining"], "#cba6f7")
+                    self._overlay_status(self.s["refining"], "#cba6f7")
                 t0 = time.time()
                 final_text = self.llm.refine(raw_text, self.prompt_template)
                 logger.info("✨ Result (LLM %.1fs): %s", time.time() - t0, final_text)
@@ -421,7 +437,7 @@ class TalkRefineApp:
             # Output
             if self.overlay:
                 display = final_text[:25] + ("..." if len(final_text) > 25 else "")
-                self.overlay.set_status(f"✅ {display}", "#a6e3a1")
+                self._overlay_status(f"✅ {display}", "#a6e3a1")
 
             from talkrefine.platform import windows as plat
             if self.config["output"]["auto_paste"]:
@@ -432,13 +448,13 @@ class TalkRefineApp:
                 logger.info(self.s["copied"])
 
             if self.overlay:
-                self.overlay.schedule_hide(3000)
+                self._overlay_hide(3000)
 
         except Exception as e:
             logger.exception("❌ Error: %s", e)
             if self.overlay:
-                self.overlay.set_status(self.s["error"], "#f38ba8")
-                self.overlay.schedule_hide(3000)
+                self._overlay_status(self.s["error"], "#f38ba8")
+                self._overlay_hide(3000)
         finally:
             try:
                 os.unlink(tmp_path)
@@ -448,8 +464,8 @@ class TalkRefineApp:
     def _show_warning(self, msg: str):
         logger.info("⚠️  %s", msg)
         if self.overlay:
-            self.overlay.set_status(f"⚠️ {msg}", "#f38ba8")
-            self.overlay.schedule_hide(2000)
+            self._overlay_status(f"⚠️ {msg}", "#f38ba8")
+            self._overlay_hide(2000)
 
     def run(self):
         """Start the application."""
@@ -532,10 +548,8 @@ class TalkRefineApp:
                 self.init_models()
             except Exception as e:
                 logger.exception("❌ Model loading failed: %s", e)
-                if self.overlay:
-                    self.overlay.set_status(
-                        f"❌ Model load failed: {e}", "#f38ba8")
-                    self.overlay.schedule_hide(5000)
+                self._overlay_status(f"❌ Model load failed: {e}", "#f38ba8")
+                self._overlay_hide(5000)
 
         threading.Thread(target=init_models_bg, daemon=True).start()
 
