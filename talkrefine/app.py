@@ -147,6 +147,9 @@ class TalkRefineApp:
 
         t0 = time.time()
         self.llm = _create_llm_provider(self.config)
+        # Pre-load LLM into memory (avoids cold start delay on first use)
+        if hasattr(self.llm, 'warmup'):
+            self.llm.warmup()
         logger.info("✅ LLM: %s (loaded in %.1fs)", self.llm.name, time.time() - t0)
 
         from talkrefine.llm.prompts import load_prompt

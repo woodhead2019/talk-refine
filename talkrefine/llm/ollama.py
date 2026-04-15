@@ -17,6 +17,22 @@ class OllamaProvider(LLMProvider):
     def name(self) -> str:
         return f"Ollama ({self._model})"
 
+    def warmup(self):
+        """Pre-load model into memory with long keep_alive."""
+        try:
+            requests.post(
+                f"{self._endpoint}/api/generate",
+                json={
+                    "model": self._model,
+                    "prompt": "",
+                    "stream": False,
+                    "keep_alive": "24h",
+                },
+                timeout=60,
+            )
+        except Exception:
+            pass
+
     def refine(self, raw_text: str, prompt_template: str) -> str:
         prompt = prompt_template.replace("{text}", raw_text)
         try:
@@ -26,7 +42,8 @@ class OllamaProvider(LLMProvider):
                     "model": self._model,
                     "prompt": prompt,
                     "stream": False,
-                    "think": False,  # Disable thinking mode (qwen3.5 etc.)
+                    "think": False,
+                    "keep_alive": "24h",
                     "options": {
                         "temperature": self._temperature,
                         "num_predict": self._max_tokens,
