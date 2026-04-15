@@ -2,6 +2,7 @@
 
 import tkinter as tk
 import math
+import queue as _queue
 
 # AI gradient colors: purple → blue → cyan → orange → red
 _GRADIENT_COLORS = [
@@ -48,6 +49,7 @@ class VolumeOverlay:
 
     def __init__(self):
         self.root = tk.Tk()
+        self._ui_queue = _queue.Queue()  # thread-safe queue for cross-thread UI ops
         self.root.title("TalkRefine")
         self.root.attributes("-topmost", True)
         self.root.overrideredirect(True)
@@ -139,7 +141,19 @@ class VolumeOverlay:
     def schedule_hide(self, delay_ms: int = 3000):
         self.root.after(delay_ms, self.hide)
 
+    def invoke_on_main(self, fn):
+        """Thread-safe: enqueue a callable to run on the main/tkinter thread."""
+        self._ui_queue.put(fn)
+
     def _update_loop(self):
+        # Drain the thread-safe UI queue
+        try:
+            while True:
+                fn = self._ui_queue.get_nowait()
+                fn()
+        except _queue.Empty:
+            pass
+
         if self._recording_ref:
             vol = self._volume_ref
             active_count = int(vol * len(self._bar_segments))

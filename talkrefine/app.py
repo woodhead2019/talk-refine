@@ -143,31 +143,19 @@ class TalkRefineApp:
 
 
     def _overlay_show(self, text, color="#a6e3a1"):
-        """Thread-safe overlay show."""
-        if not self.overlay:
-            return
-        try:
-            self.overlay.root.after_idle(lambda: self.overlay.show(text))
-        except Exception:
-            pass
+        """Thread-safe overlay show via queue."""
+        if self.overlay:
+            self.overlay.invoke_on_main(lambda: self.overlay.show(text))
 
     def _overlay_status(self, text, color="#cdd6f4"):
-        """Thread-safe overlay set_status."""
-        if not self.overlay:
-            return
-        try:
-            self.overlay.root.after_idle(lambda: self.overlay.set_status(text, color))
-        except Exception:
-            pass
+        """Thread-safe overlay set_status via queue."""
+        if self.overlay:
+            self.overlay.invoke_on_main(lambda: self.overlay.set_status(text, color))
 
     def _overlay_hide(self, delay_ms=3000):
-        """Thread-safe overlay schedule_hide."""
-        if not self.overlay:
-            return
-        try:
-            self.overlay.root.after_idle(lambda: self.overlay.schedule_hide(delay_ms))
-        except Exception:
-            pass
+        """Thread-safe overlay schedule_hide via queue."""
+        if self.overlay:
+            self.overlay.invoke_on_main(lambda: self.overlay.schedule_hide(delay_ms))
 
     def init_models(self):
         """Load ASR model and LLM provider (called from background thread)."""
