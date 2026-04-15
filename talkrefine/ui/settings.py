@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import subprocess
 import os
+import threading
 import urllib.request
 import urllib.error
 import json
@@ -195,8 +196,9 @@ class SettingsWindow:
         self._build_llm_tab(notebook)
         self._build_output_tab(notebook)
 
-        # Auto-load Ollama models on startup
-        self.win.after(500, self._refresh_ollama_models)
+        # Auto-load Ollama models only if LLM is enabled
+        if self.config.get("llm", {}).get("enabled", False):
+            self.win.after(500, self._refresh_ollama_models)
 
         # Bottom buttons
         btn_frame = ttk.Frame(self.win)
@@ -532,20 +534,21 @@ class SettingsWindow:
                 text=self.s["endpoint_fail"], foreground="red")
 
     def _refresh_ollama_models(self):
-        models = discover_ollama_models()
-        if models:
-            self.llm_model_combo["values"] = models
-        else:
-            # Also try the HTTP API
-            try:
-                url = self.llm_endpoint_var.get().rstrip("/") + "/api/tags"
-                with urllib.request.urlopen(url, timeout=5) as resp:
-                    data = json.loads(resp.read())
-                    models = [m["name"] for m in data.get("models", [])]
-                    if models:
-                        self.llm_model_combo["values"] = models
-            except Exception:
-                pass
+        """Discover Ollama models in background thread (non-blocking)."""
+        def _discover():
+            models = discover_ollama_models()
+            if not models:
+                try:
+                    url = self.llm_endpoint_var.get().rstrip("/") + "/api/tags"
+                    with urllib.request.urlopen(url, timeout=5) as resp:
+                        data = json.loads(resp.read())
+                        models = [m["name"] for m in data.get("models", [])]
+                except Exception:
+                    pass
+            if models and self.win and self.win.winfo_exists():
+                self.win.after(0, lambda: self.llm_model_combo.configure(values=models))
+
+        threading.Thread(target=_discover, daemon=True).start()
 
     # ────────────── Tab 4: Output ──────────────
 

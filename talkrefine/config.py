@@ -16,7 +16,7 @@ DEFAULTS = {
         "hub": "hf",
     },
     "llm": {
-        "enabled": True,
+        "enabled": False,
         "provider": "ollama",
         "endpoint": "http://localhost:11434",
         "model": "qwen3.5:2b",
