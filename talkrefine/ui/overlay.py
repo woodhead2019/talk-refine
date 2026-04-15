@@ -94,27 +94,27 @@ class VolumeOverlay:
             fill="#cdd6f4"
         )
 
-        # Volume bar background (rounded)
+        # Volume bar background (simple rectangle)
         bar_x = 20
-        bar_y = 40
+        bar_y = 42
         self.bar_w = self.width - 40
-        self.bar_h = 14
-        _round_rect(self.bg_canvas, bar_x, bar_y,
-                     bar_x + self.bar_w, bar_y + self.bar_h,
-                     radius=7, fill="#313244")
+        self.bar_h = 10
+        self.bg_canvas.create_rectangle(
+            bar_x, bar_y, bar_x + self.bar_w, bar_y + self.bar_h,
+            fill="#313244", outline="")
 
-        # Gradient bar segments (pre-create for performance)
+        # Gradient bar segments (simple rectangles)
         self._bar_x = bar_x
         self._bar_y = bar_y
         self._bar_segments = []
-        seg_count = 50  # number of gradient segments
+        seg_count = 50
         seg_w = self.bar_w / seg_count
         for i in range(seg_count):
             t = i / (seg_count - 1)
             color = _interpolate_color(_GRADIENT_COLORS, t)
             sx = bar_x + i * seg_w
             seg = self.bg_canvas.create_rectangle(
-                sx, bar_y + 1, sx + seg_w + 1, bar_y + self.bar_h - 1,
+                sx, bar_y, sx + seg_w + 1, bar_y + self.bar_h,
                 fill=color, outline="", state="hidden"
             )
             self._bar_segments.append(seg)
