@@ -3,38 +3,6 @@
 import tkinter as tk
 import math
 
-# Overlay strings by language
-_OVERLAY_STRINGS = {
-    "zh": {
-        "recording": "🎤 录音中... {hotkey}=完成  {cancel}=取消",
-        "recognizing": "⏳ 识别中...",
-        "refining": "✍️ 润色中...",
-        "cancelled": "🚫 已取消",
-        "no_audio": "⚠️ 未检测到音频",
-        "too_short": "⚠️ 录音太短",
-        "no_speech": "⚠️ 未识别到内容",
-        "error": "❌ 出错",
-        "ready": "🟢 按 {hotkey} 开始录音",
-        "loading": "⏳ 加载模型中...",
-        "pasted": "📋 已粘贴",
-        "copied": "📋 已复制",
-    },
-    "en": {
-        "recording": "🎤 Recording... {hotkey}=done  {cancel}=cancel",
-        "recognizing": "⏳ Recognizing...",
-        "refining": "✍️ Refining...",
-        "cancelled": "🚫 Cancelled",
-        "no_audio": "⚠️ No audio detected",
-        "too_short": "⚠️ Too short",
-        "no_speech": "⚠️ No speech detected",
-        "error": "❌ Error",
-        "ready": "🟢 Press {hotkey} to record",
-        "loading": "⏳ Loading model...",
-        "pasted": "📋 Pasted",
-        "copied": "📋 Copied",
-    },
-}
-
 # AI gradient colors: purple → blue → cyan → orange → red
 _GRADIENT_COLORS = [
     (138, 43, 226),   # purple
@@ -43,10 +11,6 @@ _GRADIENT_COLORS = [
     (245, 158, 11),   # orange
     (239, 68, 68),    # red
 ]
-
-
-def get_overlay_strings(lang: str = "zh") -> dict:
-    return _OVERLAY_STRINGS.get(lang, _OVERLAY_STRINGS["en"])
 
 
 def _interpolate_color(colors, t):

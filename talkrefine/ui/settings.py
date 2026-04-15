@@ -18,124 +18,12 @@ import urllib.request
 import urllib.error
 import json
 from pathlib import Path
+from talkrefine.locale import get_strings, _STRINGS
 
 _FONT = ("Microsoft YaHei UI", 10)
 _FONT_BOLD = ("Microsoft YaHei UI", 10, "bold")
 _FONT_SMALL = ("Microsoft YaHei UI", 9)
 _FONT_HEADING = ("Microsoft YaHei UI", 11, "bold")
-
-# ── Localisation strings ──
-
-_STRINGS = {
-    "zh": {
-        "settings_title": "TalkRefine 设置",
-        "tab_general": "通用",
-        "tab_asr": "语音识别",
-        "tab_llm": "LLM 润色",
-        "tab_output": "输出",
-        "ui_language": "界面语言",
-        "autostart": "开机自动启动",
-        "record_hotkey": "录音快捷键",
-        "cancel_key": "取消快捷键",
-        "recognition_lang": "识别语言",
-        "asr_model": "识别模型",
-        "device": "运行设备",
-        "enable_llm": "启用 LLM 润色",
-        "provider": "提供者",
-        "endpoint": "服务端点",
-        "detect": "检测",
-        "model": "模型",
-        "refresh": "刷新",
-        "api_key": "API Key",
-        "prompt": "提示词",
-        "prompt_presets": "预设模板",
-        "general_preset": "通用",
-        "meeting_preset": "会议",
-        "code_preset": "代码",
-        "temperature": "Temperature",
-        "auto_paste": "自动粘贴到光标",
-        "preserve_clipboard": "粘贴后恢复剪贴板",
-        "save": "💾 保存",
-        "cancel": "取消",
-        "auto_detect": "自动",
-        "chinese": "中文",
-        "hotkey_conflict": "⚠️ 此快捷键可能与输入法冲突",
-        "save_success": "保存成功",
-        "save_msg": "配置已生效。ASR 模型更改需要重启。",
-        "history_title": "TalkRefine 历史记录",
-        "time_col": "时间",
-        "duration_col": "时长",
-        "raw_col": "原始转写",
-        "refined_col": "润色结果",
-        "copy_refined": "📋 复制润色结果",
-        "copy_raw": "📋 复制原始转写",
-        "clear_history": "🗑️ 清空",
-        "clear_confirm": "确定要清空所有历史记录吗？",
-        "confirm": "确认",
-        "detail": "详情",
-        "recommended_cn": "推荐中文",
-        "endpoint_ok": "✅ 连接成功",
-        "endpoint_fail": "❌ 连接失败",
-        "search": "搜索...",
-        "select_first": "请先选择一条记录",
-        "copied": "已复制",
-        "lang_change_note": "语言变更将在重新打开设置窗口后生效。",
-    },
-    "en": {
-        "settings_title": "TalkRefine Settings",
-        "tab_general": "General",
-        "tab_asr": "Speech Recognition",
-        "tab_llm": "LLM Refinement",
-        "tab_output": "Output",
-        "ui_language": "UI Language",
-        "autostart": "Start on system boot",
-        "record_hotkey": "Record Hotkey",
-        "cancel_key": "Cancel Key",
-        "recognition_lang": "Recognition Language",
-        "asr_model": "Recognition Model",
-        "device": "Device",
-        "enable_llm": "Enable LLM Refinement",
-        "provider": "Provider",
-        "endpoint": "Endpoint",
-        "detect": "Detect",
-        "model": "Model",
-        "refresh": "Refresh",
-        "api_key": "API Key",
-        "prompt": "Prompt",
-        "prompt_presets": "Presets",
-        "general_preset": "General",
-        "meeting_preset": "Meeting",
-        "code_preset": "Code",
-        "temperature": "Temperature",
-        "auto_paste": "Auto-paste at cursor",
-        "preserve_clipboard": "Restore clipboard after paste",
-        "save": "💾 Save",
-        "cancel": "Cancel",
-        "auto_detect": "Auto",
-        "chinese": "Chinese",
-        "hotkey_conflict": "⚠️ May conflict with input method",
-        "save_success": "Saved",
-        "save_msg": "Config applied. ASR model changes require restart.",
-        "history_title": "TalkRefine History",
-        "time_col": "Time",
-        "duration_col": "Duration",
-        "raw_col": "Raw Text",
-        "refined_col": "Refined Text",
-        "copy_refined": "📋 Copy Refined",
-        "copy_raw": "📋 Copy Raw",
-        "clear_history": "🗑️ Clear All",
-        "clear_confirm": "Clear all history?",
-        "confirm": "Confirm",
-        "detail": "Detail",
-        "recommended_cn": "Best for Chinese",
-        "endpoint_ok": "✅ Connected",
-        "endpoint_fail": "❌ Failed",
-        "search": "Search...",
-        "select_first": "Please select an entry first",
-        "copied": "Copied",
-        "lang_change_note": "Language change takes effect after reopening settings.",
-    },
-}
 
 # ── ASR model options (combined engine + model) ──
 
@@ -269,9 +157,7 @@ class SettingsWindow:
         self._parent = parent
 
         lang = config.get("ui_language", "zh")
-        if lang not in _STRINGS:
-            lang = "zh"
-        self.s = _STRINGS[lang]
+        self.s = get_strings(lang)
 
     def show(self):
         if self.win and self.win.winfo_exists():
@@ -458,7 +344,7 @@ class SettingsWindow:
         not_installed = [e for e in ("sensevoice", "whisper") if not avail.get(e, False)]
         if not_installed:
             install_frame = ttk.LabelFrame(
-                tab, text="📦 " + ("安装更多引擎" if self.s == _STRINGS["zh"] else "Install More Engines"),
+                tab, text=self.s["install_more"],
                 padding=10)
             install_frame.pack(fill="x", pady=(5, 0))
 
@@ -577,8 +463,7 @@ class SettingsWindow:
         self.prompt_text.pack(fill="x", padx=4, pady=(0, 4))
         self.prompt_text.insert("1.0", _load_prompt_from_config(self.config))
 
-        restore_label = "🔄 恢复默认" if self.s == _STRINGS["zh"] else "🔄 Restore Default"
-        ttk.Button(prompt_frame, text=restore_label, width=14,
+        ttk.Button(prompt_frame, text=self.s["restore_default"], width=14,
                    command=self._restore_default_prompt).pack(anchor="e", padx=4, pady=(0, 4))
 
 
@@ -776,7 +661,7 @@ class HistoryWindow:
         self._filter_text = ""
         if lang not in _STRINGS:
             lang = "zh"
-        self.s = _STRINGS[lang]
+        self.s = get_strings(lang)
 
     def show(self):
         from talkrefine.history import load_history  # noqa: F811

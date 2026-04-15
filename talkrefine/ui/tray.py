@@ -7,24 +7,10 @@ from PIL import Image, ImageDraw
 from talkrefine.ui.icon import create_app_icon
 
 from talkrefine.history import load_recent
+from talkrefine.locale import get_strings
 
 _MENU_FONT = ("Microsoft YaHei UI", 10)
 _MENU_FONT_SMALL = ("Microsoft YaHei UI", 9)
-
-_TRAY_STRINGS = {
-    "zh": {
-        "recent": "── 最近记录 ──",
-        "history": "📜 历史记录",
-        "settings": "⚙️ 设置",
-        "quit": "退出",
-    },
-    "en": {
-        "recent": "── Recent ──",
-        "history": "📜 History",
-        "settings": "⚙️ Settings",
-        "quit": "Quit",
-    },
-}
 
 
 def _create_icon_image() -> Image.Image:
@@ -68,7 +54,7 @@ class TrayIcon:
         self._llm_enabled = True
         self._icon = None
         self._tk_root = tk_root
-        self._s = _TRAY_STRINGS.get(ui_language, _TRAY_STRINGS["zh"])
+        self._s = get_strings(ui_language)
 
     @property
     def llm_enabled(self) -> bool:
