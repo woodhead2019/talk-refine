@@ -262,14 +262,16 @@ class TalkRefineApp:
         self.llm = _create_llm_provider(new_config)
         logger.info("🔄 LLM: %s", self.llm.name)
 
-        # Unload old model if LLM was disabled, warmup if enabled
-        if not new_config["llm"]["enabled"]:
-            if hasattr(old_llm, 'unload'):
-                old_llm.unload()
-                logger.info("💾 LLM model unloaded (freed memory)")
-        elif new_config["llm"]["enabled"] and hasattr(self.llm, 'warmup'):
-            self.llm.warmup()
-            logger.info("🔥 LLM model warmed up")
+        # Unload old model if LLM was disabled, warmup if enabled (non-blocking)
+        def _llm_memory_op():
+            if not new_config["llm"]["enabled"]:
+                if hasattr(old_llm, 'unload'):
+                    old_llm.unload()
+                    logger.info("💾 LLM model unloaded (freed memory)")
+            elif new_config["llm"]["enabled"] and hasattr(self.llm, 'warmup'):
+                self.llm.warmup()
+                logger.info("🔥 LLM model warmed up")
+        threading.Thread(target=_llm_memory_op, daemon=True).start()
 
         # Reload prompt
         prompt_cfg = new_config["llm"]

@@ -42,7 +42,22 @@ def _create_hidden_window():
 
     wnd_proc_cb = WNDPROC(wnd_proc)
 
-    wc = ctypes.wintypes.WNDCLASSW()
+    # Define WNDCLASSW manually (not available in all ctypes.wintypes versions)
+    class WNDCLASSW(ctypes.Structure):
+        _fields_ = [
+            ("style", ctypes.c_uint),
+            ("lpfnWndProc", WNDPROC),
+            ("cbClsExtra", ctypes.c_int),
+            ("cbWndExtra", ctypes.c_int),
+            ("hInstance", ctypes.wintypes.HINSTANCE),
+            ("hIcon", ctypes.wintypes.HICON),
+            ("hCursor", ctypes.wintypes.HANDLE),
+            ("hbrBackground", ctypes.wintypes.HANDLE),
+            ("lpszMenuName", ctypes.wintypes.LPCWSTR),
+            ("lpszClassName", ctypes.wintypes.LPCWSTR),
+        ]
+
+    wc = WNDCLASSW()
     wc.lpfnWndProc = wnd_proc_cb
     wc.lpszClassName = "TalkRefineSessionMonitor"
     wc.hInstance = ctypes.windll.kernel32.GetModuleHandleW(None)
