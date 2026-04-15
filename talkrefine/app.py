@@ -135,21 +135,31 @@ class TalkRefineApp:
         self.os = get_overlay_strings(ui_lang)
 
     def init_models(self):
-        """Load ASR model and LLM provider."""
-        logger.info("⏳ Loading ASR model...")
-        if self.overlay:
-            self.overlay.show(self.os["loading"])
+        """Load ASR model and LLM provider (called from background thread)."""
+        # Update overlay via tkinter thread-safe method
+        def _show_status(text, color="#89b4fa"):
+            if self.overlay:
+                self.overlay.root.after(0, lambda: (
+                    self.overlay.show(text),
+                    self.overlay.set_status(text, color)
+                ))
 
+        _show_status(self.os["loading"])
+
+        logger.info("⏳ Loading ASR model...")
+        _show_status("⏳ ASR model loading...")
         t0 = time.time()
         self.asr = _create_asr_engine(self.config)
         self.asr.load()
         logger.info("✅ ASR: %s (loaded in %.1fs)", self.asr.name, time.time() - t0)
 
+        logger.info("⏳ Loading LLM...")
+        _show_status("⏳ LLM loading...")
         t0 = time.time()
         self.llm = _create_llm_provider(self.config)
-        # Pre-load LLM into memory only if enabled
+        # Pre-load LLM into memory only if enabled (non-blocking warmup)
         if self.config["llm"]["enabled"] and hasattr(self.llm, 'warmup'):
-            self.llm.warmup()
+            threading.Thread(target=self.llm.warmup, daemon=True).start()
         logger.info("✅ LLM: %s (loaded in %.1fs)", self.llm.name, time.time() - t0)
 
         from talkrefine.llm.prompts import load_prompt
@@ -183,9 +193,11 @@ class TalkRefineApp:
         logger.info("\n🟢 Ready! Press [%s] to record", hotkey)
 
         if self.overlay:
-            self.overlay.set_status(
-                self.os["ready"].format(hotkey=hotkey), "#a6e3a1")
-            self.overlay.schedule_hide(2000)
+            self.overlay.root.after(0, lambda: (
+                self.overlay.set_status(
+                    self.os["ready"].format(hotkey=hotkey), "#a6e3a1"),
+                self.overlay.schedule_hide(2000)
+            ))
 
     def toggle_recording(self):
         if not self._models_ready:
