@@ -17,7 +17,7 @@ DEFAULTS = {
     },
     "llm": {
         "enabled": False,
-        "provider": "llamacpp",
+        "provider": "ollama",
         "endpoint": "http://localhost:11434",
         "model": "qwen3.5:2b",
         "model_path": "",
