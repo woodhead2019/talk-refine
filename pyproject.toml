@@ -37,9 +37,10 @@ dependencies = [
 [project.optional-dependencies]
 torch-cpu = ["torch", "torchaudio"]
 torch-cuda = ["torch", "torchaudio"]
+llamacpp = ["llama-cpp-python"]
 whisper = ["openai-whisper"]
 win32 = ["pywin32"]
-all = ["talkrefine[torch-cpu,whisper,win32]"]
+all = ["talkrefine[torch-cpu,llamacpp,whisper,win32]"]
 
 [project.scripts]
 talkrefine = "talkrefine.app:main"

@@ -109,23 +109,28 @@ Write-Host "Select components to install:" -ForegroundColor Cyan
 Write-Host ""
 
 function Ask-YesNo($prompt, $default = "Y") {
-    $answer = Read-Host "$prompt [Y/n]"
+    $hint = if ($default -eq "Y") { "[Y/n]" } else { "[y/N]" }
+    $answer = Read-Host "$prompt $hint"
     if ([string]::IsNullOrWhiteSpace($answer)) { $answer = $default }
     return $answer.ToUpper() -eq "Y"
 }
 
 $installPythonRT  = Ask-YesNo "  [1] Python runtime (if not installed)"
 $installFFmpeg    = Ask-YesNo "  [2] ffmpeg (audio processing)"
-$installOllama    = Ask-YesNo "  [3] Ollama (local LLM runtime)"
-$installLLMModel  = Ask-YesNo "  [4] Qwen3.5:2b model (~2GB, for text refinement)"
-$installPython    = Ask-YesNo "  [5] Python packages (torch, funasr, etc.)"
-$installASRModel  = Ask-YesNo "  [6] SenseVoice ASR model (~944MB, for speech recognition)"
-$setupAutostart   = Ask-YesNo "  [7] Autostart + Start Menu shortcut"
+$installGGUFModel = Ask-YesNo "  [3] GGUF model (~1.5GB, for lightweight LLM via llama.cpp)"
+$installPython    = Ask-YesNo "  [4] Python packages (torch, funasr, llama-cpp-python, etc.)"
+$installASRModel  = Ask-YesNo "  [5] SenseVoice ASR model (~944MB, for speech recognition)"
+$setupAutostart   = Ask-YesNo "  [6] Autostart + Start Menu shortcut"
+$installOllama    = Ask-YesNo "  [7] Ollama (optional, alternative LLM runtime)" "N"
+$installLLMModel  = $false
+if ($installOllama) {
+    $installLLMModel = Ask-YesNo "  [8] Qwen3.5:2b Ollama model (~2GB, for text refinement via Ollama)"
+}
 
 Write-Host ""
 
 $step = 0
-$total = @($installPythonRT, $installFFmpeg, $installOllama, $installLLMModel, $installPython, $installASRModel, $setupAutostart) | Where-Object { $_ } | Measure-Object | Select-Object -ExpandProperty Count
+$total = @($installPythonRT, $installFFmpeg, $installGGUFModel, $installOllama, $installLLMModel, $installPython, $installASRModel, $setupAutostart) | Where-Object { $_ } | Measure-Object | Select-Object -ExpandProperty Count
 if ($total -eq 0) {
     Write-Host "Nothing selected. Exiting." -ForegroundColor Yellow
     exit 0
@@ -211,7 +216,43 @@ if ($installFFmpeg) {
     }
 }
 
-# ── Ollama ──
+# ── GGUF Model (llama.cpp) ──
+if ($installGGUFModel) {
+    $step++
+    Write-Host "[$step/$total] Downloading GGUF model (Qwen3.5-2B-Q4_K_M ~1.5GB)..." -ForegroundColor Cyan
+    $modelDir = Join-Path $env:USERPROFILE ".talkrefine\models"
+    $modelFile = Join-Path $modelDir "Qwen3.5-2B-Q4_K_M.gguf"
+    if (Test-Path $modelFile) {
+        Write-Host "  [OK] Already downloaded" -ForegroundColor Green
+    } else {
+        if (-not (Test-Path $modelDir)) { New-Item -ItemType Directory -Path $modelDir -Force | Out-Null }
+        Write-Host "  Downloading via huggingface_hub (~1.5GB, may take a few minutes)..." -ForegroundColor Yellow
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+        $projectDir = Split-Path -Parent $scriptDir
+        Push-Location $projectDir
+        $venvActivate = Join-Path $projectDir "venv\Scripts\Activate.ps1"
+        if (Test-Path $venvActivate) { & $venvActivate }
+        $ErrorActionPreference = "Continue"
+        python -c "
+from huggingface_hub import hf_hub_download
+path = hf_hub_download(
+    repo_id='unsloth/Qwen3.5-2B-GGUF',
+    filename='Qwen3.5-2B-Q4_K_M.gguf',
+    local_dir=r'$modelDir',
+)
+print(f'Downloaded to: {path}')
+" 2>&1
+        $ErrorActionPreference = "Stop"
+        Pop-Location
+        if (Test-Path $modelFile) {
+            Write-Host "  [OK] GGUF model ready: $modelFile" -ForegroundColor Green
+        } else {
+            Write-Host "  [WARN] Download may have failed. You can download manually later." -ForegroundColor Yellow
+        }
+    }
+}
+
+# ── Ollama (optional) ──
 if ($installOllama) {
     $step++
     Write-Host "[$step/$total] Checking Ollama..." -ForegroundColor Cyan
@@ -269,7 +310,7 @@ if ($installPython) {
 
     # Install talkrefine + all dependencies from pyproject.toml
     Write-Host "  Installing talkrefine and dependencies..." -ForegroundColor Yellow
-    pip install -e ".[win32]" --quiet 2>&1 | Out-Null
+    pip install -e ".[win32,llamacpp]" --quiet 2>&1 | Out-Null
 
     # Verify critical packages
     $missing = @()

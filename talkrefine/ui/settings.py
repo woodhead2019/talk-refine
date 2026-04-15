@@ -11,7 +11,7 @@ except Exception:
         pass
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import subprocess
 import os
 import threading
@@ -411,19 +411,20 @@ class SettingsWindow:
 
         ttk.Label(prov_frame, text=self.s["provider"] + ":").grid(
             row=0, column=0, sticky="w", padx=8, pady=4)
-        self.llm_provider_var = tk.StringVar(value=llm.get("provider", "ollama"))
+        self.llm_provider_var = tk.StringVar(value=llm.get("provider", "llamacpp"))
         provider_combo = ttk.Combobox(
             prov_frame, textvariable=self.llm_provider_var,
-            values=["ollama", "openai", "none"], width=14,
+            values=["llamacpp", "ollama", "openai", "none"], width=14,
             state="readonly", font=_FONT)
         provider_combo.grid(row=0, column=1, sticky="w", padx=8, pady=4)
         provider_combo.bind("<<ComboboxSelected>>", self._on_provider_change)
 
-        # Endpoint + detect
-        ttk.Label(prov_frame, text=self.s["endpoint"] + ":").grid(
-            row=1, column=0, sticky="w", padx=8, pady=4)
+        # Endpoint + detect (ollama/openai)
+        self.endpoint_label = ttk.Label(prov_frame, text=self.s["endpoint"] + ":")
+        self.endpoint_label.grid(row=1, column=0, sticky="w", padx=8, pady=4)
         ep_inner = ttk.Frame(prov_frame)
         ep_inner.grid(row=1, column=1, sticky="ew", padx=8, pady=4)
+        self.ep_inner = ep_inner
         self.llm_endpoint_var = tk.StringVar(
             value=llm.get("endpoint", "http://localhost:11434"))
         ttk.Entry(ep_inner, textvariable=self.llm_endpoint_var, width=35,
@@ -434,19 +435,34 @@ class SettingsWindow:
                                           font=_FONT)
         self.endpoint_status.pack(side="left", padx=4)
 
+        # Model path + browse (llamacpp)
+        self.model_path_label = ttk.Label(
+            prov_frame, text=self.s["model_path"] + ":")
+        self.model_path_label.grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        mp_inner = ttk.Frame(prov_frame)
+        mp_inner.grid(row=2, column=1, sticky="ew", padx=8, pady=4)
+        self.mp_inner = mp_inner
+        self.llm_model_path_var = tk.StringVar(
+            value=llm.get("model_path", ""))
+        ttk.Entry(mp_inner, textvariable=self.llm_model_path_var, width=35,
+                  font=_FONT).pack(side="left")
+        ttk.Button(mp_inner, text=f"📂 {self.s['browse']}", width=10,
+                   command=self._browse_model_path).pack(side="left", padx=4)
+
         # API key (openai only)
         self.api_key_label = ttk.Label(prov_frame, text=self.s["api_key"] + ":")
-        self.api_key_label.grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        self.api_key_label.grid(row=3, column=0, sticky="w", padx=8, pady=4)
         self.llm_api_key_var = tk.StringVar(value=llm.get("api_key", ""))
         self.api_key_entry = ttk.Entry(prov_frame, textvariable=self.llm_api_key_var,
                                        width=35, font=_FONT, show="*")
-        self.api_key_entry.grid(row=2, column=1, sticky="w", padx=8, pady=4)
+        self.api_key_entry.grid(row=3, column=1, sticky="w", padx=8, pady=4)
 
-        # Model + refresh
-        ttk.Label(prov_frame, text=self.s["model"] + ":").grid(
-            row=3, column=0, sticky="w", padx=8, pady=4)
+        # Model + refresh (ollama)
+        self.model_label = ttk.Label(prov_frame, text=self.s["model"] + ":")
+        self.model_label.grid(row=4, column=0, sticky="w", padx=8, pady=4)
         model_inner = ttk.Frame(prov_frame)
-        model_inner.grid(row=3, column=1, sticky="ew", padx=8, pady=4)
+        model_inner.grid(row=4, column=1, sticky="ew", padx=8, pady=4)
+        self.model_inner = model_inner
         self.llm_model_var = tk.StringVar(value=llm.get("model", "qwen2.5:3b"))
         self.llm_model_combo = ttk.Combobox(
             model_inner, textvariable=self.llm_model_var, width=24, font=_FONT)
@@ -510,6 +526,7 @@ class SettingsWindow:
 
     def _on_provider_change(self, _event=None):
         provider = self.llm_provider_var.get()
+        # API key: only for openai
         if provider == "openai":
             self.api_key_label.grid()
             self.api_key_entry.grid()
@@ -517,10 +534,45 @@ class SettingsWindow:
             self.api_key_label.grid_remove()
             self.api_key_entry.grid_remove()
 
+        # Model path: only for llamacpp
+        if provider == "llamacpp":
+            self.model_path_label.grid()
+            self.mp_inner.grid()
+        else:
+            self.model_path_label.grid_remove()
+            self.mp_inner.grid_remove()
+
+        # Endpoint: only for ollama/openai
+        if provider in ("ollama", "openai"):
+            self.endpoint_label.grid()
+            self.ep_inner.grid()
+        else:
+            self.endpoint_label.grid_remove()
+            self.ep_inner.grid_remove()
+
+        # Model combo + refresh: only for ollama/openai
+        if provider in ("ollama", "openai"):
+            self.model_label.grid()
+            self.model_inner.grid()
+        else:
+            self.model_label.grid_remove()
+            self.model_inner.grid_remove()
+
+        # Refresh button: only for ollama
         if provider == "ollama":
             self.refresh_btn.pack(side="left", padx=4)
         else:
             self.refresh_btn.pack_forget()
+
+    def _browse_model_path(self):
+        """Open file dialog to select a .gguf model file."""
+        path = filedialog.askopenfilename(
+            title=self.s["model_path"],
+            filetypes=[("GGUF Models", "*.gguf"), ("All Files", "*.*")],
+            parent=self.win,
+        )
+        if path:
+            self.llm_model_path_var.set(path)
 
     def _detect_endpoint(self):
         url = self.llm_endpoint_var.get().rstrip("/")
@@ -599,6 +651,7 @@ class SettingsWindow:
                 "provider": self.llm_provider_var.get(),
                 "endpoint": self.llm_endpoint_var.get().strip(),
                 "model": self.llm_model_var.get(),
+                "model_path": self.llm_model_path_var.get().strip(),
                 "api_key": self.llm_api_key_var.get(),
                 "temperature": round(self.llm_temp_var.get(), 2),
                 "max_tokens": self.config.get("llm", {}).get("max_tokens", 512),

@@ -10,7 +10,7 @@
 - 🔒 **完全离线**，数据不出本机
 - ⚡ **极速**，10 秒语音不到 1 秒识别，LLM 热状态 ~1-2 秒完成润色
 - 🌍 **多语言**，中文、英文、日文、韩文等
-- 🧠 **可插拔引擎**，通过配置文件切换 ASR 模型和 LLM
+- 🧠 **可插拔引擎**，通过配置文件切换 ASR 模型和 LLM（llama.cpp / Ollama / OpenAI）
 - 📋 **智能粘贴**，自动粘贴到光标，剪贴板内容不丢失
 - 🎨 **现代 UI**，圆角浮窗 + AI 渐变音量条 + 系统托盘
 - 🌍 **中英双语界面**，设置中一键切换
@@ -44,23 +44,26 @@ cd talk-refine
 .\scripts\install.ps1
 ```
 
-自动安装 Python 依赖、ffmpeg、Ollama + Qwen，并设置开机自启。
+自动安装 Python 依赖、ffmpeg、GGUF 模型，并设置开机自启。
 
 ### 手动安装
 
 ```powershell
 # 1. 安装系统依赖
 winget install Gyan.FFmpeg
-winget install Ollama.Ollama
-ollama pull qwen3.5:2b
 
 # 2. 安装 Python 包
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-pip install funasr modelscope pyaudio pyperclip pyautogui requests pystray Pillow pyyaml
+pip install funasr modelscope pyaudio pyperclip pyautogui requests pystray Pillow pyyaml llama-cpp-python
 
-# 3. 运行
+# 3. 下载 GGUF 模型（轻量 LLM，~1.5GB）
+python -c "from huggingface_hub import hf_hub_download; hf_hub_download('unsloth/Qwen3.5-2B-GGUF', 'Qwen3.5-2B-Q4_K_M.gguf', local_dir=str(__import__('pathlib').Path.home() / '.talkrefine/models'))"
+
+# 4. 运行
 python -m talkrefine
 ```
+
+> 💡 也可使用 Ollama 作为 LLM 后端（需额外安装 `winget install Ollama.Ollama && ollama pull qwen3.5:2b`），在设置中将 provider 切换为 `ollama` 即可。
 
 ## 使用方法
 
@@ -91,8 +94,9 @@ asr:
 
 llm:
   enabled: true
-  provider: "ollama"      # "ollama" | "openai"（兼容 API）| "none"
-  endpoint: "http://localhost:11434"
+  provider: "llamacpp"    # "llamacpp"（轻量）| "ollama" | "openai"（兼容 API）| "none"
+  model_path: ""          # .gguf 文件路径（llamacpp 使用）
+  endpoint: "http://localhost:11434"  # Ollama/OpenAI 端点
   model: "qwen3.5:2b"
   prompt: "default"       # "default"（prompts/default.txt）| 自定义 .txt 路径
 
@@ -110,11 +114,12 @@ output:
 
 ### LLM 提供者
 
-| 提供者 | 配置方式 | 适用场景 |
-|--------|----------|----------|
-| **Ollama**（默认） | `ollama pull qwen3.5:2b` | 完全离线 |
-| **OpenAI 兼容** | 设置 endpoint + api_key | 云端 LLM（OpenAI、DeepSeek、vLLM 等） |
-| **None** | — | 仅转写，不润色 |
+| 提供者 | 配置方式 | 额外安装 | 适用场景 |
+|--------|----------|----------|----------|
+| **llama.cpp**（默认） | 设置 model_path 指向 .gguf 文件 | ~1.5 GB 模型 | 轻量离线，无需外部服务 |
+| **Ollama** | `ollama pull qwen3.5:2b` | ~7 GB（服务+模型） | 完全离线，多模型管理 |
+| **OpenAI 兼容** | 设置 endpoint + api_key | — | 云端 LLM（OpenAI、DeepSeek、vLLM 等） |
+| **None** | — | — | 仅转写，不润色 |
 
 ### Prompt 模板
 
@@ -138,17 +143,20 @@ output:
 | 组件 | 模型 | 内存占用 | 说明 |
 |------|------|----------|------|
 | **ASR** | SenseVoice-Small | ~3 GB | 加载后常驻（Python 进程内） |
-| **Ollama 服务** | — | ~4 GB | Ollama 本身常驻（即使没加载模型） |
-| **LLM 模型** | Qwen3.5:2b | ~5 GB | 仅开启 LLM 润色时加载 |
+| **LLM (llama.cpp)** | Qwen3.5-2B-Q4_K_M | ~2 GB | 进程内加载，无额外服务开销 |
+| **LLM (Ollama)** | Qwen3.5:2b | ~5 GB + ~4 GB 服务 | Ollama 服务本身占 ~4GB |
+
+> 💡 **推荐使用 llama.cpp 提供者**：相比 Ollama 方案节省 ~7GB 内存（无需 Ollama 服务常驻 + 模型加载更高效）。
 
 > ⚠️ **关于 Ollama 内存占用**：Ollama 服务本身即使没有加载任何模型也会占用 ~4GB 内存（Go runtime + 预分配）。如果你不需要 LLM 润色功能，可以在系统设置中关闭 Ollama 开机自启来节省这 4GB。TalkRefine 默认关闭 LLM 润色，仅使用 ASR 语音识别（~3GB）。
 
 ### 使用模式对比
 
-| 模式 | 需要 Ollama | 总内存 | 说明 |
-|------|-------------|--------|------|
-| **仅语音识别**（默认） | ❌ 不需要 | ~3 GB | 只做语音→文字，不润色 |
-| **语音识别 + LLM 润色** | ✅ 需要 | ~12 GB | 语音→文字→去口水词→结构化 |
+| 模式 | LLM 后端 | 总内存 | 说明 |
+|------|----------|--------|------|
+| **仅语音识别**（默认） | 无 | ~3 GB | 只做语音→文字，不润色 |
+| **语音识别 + llama.cpp 润色** | llama.cpp | ~5 GB | 轻量离线润色，推荐 |
+| **语音识别 + Ollama 润色** | Ollama | ~12 GB | 语音→文字→去口水词→结构化 |
 
 ### 智能内存管理
 
@@ -156,22 +164,22 @@ output:
 
 | 场景 | 行为 | LLM 内存 |
 |------|------|----------|
-| 正常使用 | 模型常驻内存，响应 ~1-2 秒 | ~5 GB |
+| 正常使用 | 模型常驻内存，响应 ~1-2 秒 | ~2 GB (llama.cpp) / ~5 GB (Ollama) |
 | **锁屏离开** | 自动卸载模型 | **释放** |
-| **解锁回来** | 自动重新加载 | ~5 GB（热缓存 ~1s） |
+| **解锁回来** | 自动重新加载 | 恢复（热缓存 ~1s） |
 | 设置中关闭 LLM | 立即卸载模型 | **释放** |
-| 设置中开启 LLM | 自动加载 | ~5 GB |
+| 设置中开启 LLM | 自动加载 | 恢复 |
 
-> 💡 不需要 LLM 润色的用户可以完全不装 Ollama，TalkRefine 仅用 SenseVoice 做语音识别也很好用。
+> 💡 不需要 LLM 润色的用户可以完全不装 Ollama 或 GGUF 模型，TalkRefine 仅用 SenseVoice 做语音识别也很好用。
 
 ## 架构
 
 ```
-┌────────────┐    ┌─────────────┐    ┌─────────────┐    ┌──────────┐
-│   麦克风   │───▶│  ASR 引擎   │───▶│ LLM 润色    │───▶│ 自动粘贴 │
-│  (PyAudio) │    │ SenseVoice  │    │ Ollama/Qwen │    │ (剪贴板  │
-│            │    │ 或 Whisper  │    │ 或 OpenAI   │    │  恢复)   │
-└────────────┘    └─────────────┘    └─────────────┘    └──────────┘
+┌────────────┐    ┌─────────────┐    ┌──────────────┐    ┌──────────┐
+│   麦克风   │───▶│  ASR 引擎   │───▶│  LLM 润色    │───▶│ 自动粘贴 │
+│  (PyAudio) │    │ SenseVoice  │    │ llama.cpp /  │    │ (剪贴板  │
+│            │    │ 或 Whisper  │    │ Ollama/OpenAI│    │  恢复)   │
+└────────────┘    └─────────────┘    └──────────────┘    └──────────┘
 ```
 
 ```
@@ -191,6 +199,7 @@ talkrefine/
 │   └── whisper.py      #   OpenAI Whisper
 ├── llm/                # LLM 润色（可插拔）
 │   ├── base.py
+│   ├── llamacpp.py     #   llama.cpp（轻量本地，默认推荐）
 │   ├── ollama.py       #   本地 Ollama
 │   ├── openai_compat.py#   OpenAI 兼容 API
 │   ├── none.py         #   直通（不润色）

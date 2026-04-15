@@ -108,6 +108,13 @@ def _create_llm_provider(config: dict):
             temperature=llm_cfg["temperature"],
             max_tokens=llm_cfg["max_tokens"],
         )
+    elif provider == "llamacpp":
+        from talkrefine.llm.llamacpp import LlamaCppProvider
+        return LlamaCppProvider(
+            model_path=llm_cfg.get("model_path", ""),
+            temperature=llm_cfg["temperature"],
+            max_tokens=llm_cfg["max_tokens"],
+        )
     elif provider == "none":
         from talkrefine.llm.none import NoneProvider
         return NoneProvider()

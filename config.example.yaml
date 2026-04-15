@@ -19,7 +19,10 @@ asr:
 # ── LLM (Text Refinement) ───────────────────────
 llm:
   enabled: true           # Set false to get raw transcription only
-  provider: "ollama"      # "ollama" | "openai" (OpenAI-compatible API) | "none"
+  provider: "llamacpp"    # "llamacpp" (lightweight) | "ollama" | "openai" (OpenAI-compatible API) | "none"
+  # llama.cpp settings (when provider is "llamacpp")
+  model_path: ""          # Path to .gguf file. Leave empty to skip LLM.
+  # Ollama settings (when provider is "ollama")
   endpoint: "http://localhost:11434"   # Ollama default
   # endpoint: "https://api.openai.com"  # OpenAI
   # endpoint: "https://api.deepseek.com" # DeepSeek

@@ -66,6 +66,9 @@ _STRINGS = {
         "restore_default": "🔄 恢复默认",
         "recommended_cn": "推荐中文",
         "install_more": "📦 安装更多引擎",
+        "model_path": "模型文件路径",
+        "browse": "浏览...",
+        "provider_llamacpp": "llama.cpp (轻量本地)",
 
         # ── History ──
         "history_title": "TalkRefine 历史记录",
@@ -148,6 +151,9 @@ _STRINGS = {
         "restore_default": "🔄 Restore Default",
         "recommended_cn": "Best for Chinese",
         "install_more": "📦 Install More Engines",
+        "model_path": "Model File Path",
+        "browse": "Browse...",
+        "provider_llamacpp": "llama.cpp (lightweight local)",
 
         # ── History ──
         "history_title": "TalkRefine History",
