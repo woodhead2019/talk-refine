@@ -258,8 +258,18 @@ class TalkRefineApp:
                         new_hotkey.upper(), new_cancel.upper())
 
         # Recreate LLM provider
+        old_llm = self.llm
         self.llm = _create_llm_provider(new_config)
         logger.info("🔄 LLM: %s", self.llm.name)
+
+        # Unload old model if LLM was disabled, warmup if enabled
+        if not new_config["llm"]["enabled"]:
+            if hasattr(old_llm, 'unload'):
+                old_llm.unload()
+                logger.info("💾 LLM model unloaded (freed memory)")
+        elif new_config["llm"]["enabled"] and hasattr(self.llm, 'warmup'):
+            self.llm.warmup()
+            logger.info("🔥 LLM model warmed up")
 
         # Reload prompt
         prompt_cfg = new_config["llm"]
