@@ -15,7 +15,7 @@
 - 🎨 **现代 UI**，圆角浮窗 + AI 渐变音量条 + 系统托盘
 - 🌍 **中英双语界面**，设置中一键切换
 - 📜 **历史记录**，500 条，支持搜索、复制原文/润色结果
-- 🔄 **自动发现 Ollama 模型**，设置界面直接选择
+- 🔄 **自动发现模型**，llamacpp 自动下载 GGUF，Ollama 自动列出已安装模型
 - 🔑 **可靠热键**，基于 Win32 RegisterHotKey API，锁屏/任务管理器后不丢失
 - 💾 **智能内存管理**，锁屏自动释放 LLM 内存，解锁自动恢复
 
@@ -121,8 +121,8 @@ output:
 
 | 提供者 | 配置方式 | 额外安装 | 适用场景 |
 |--------|----------|----------|----------|
-| **llama.cpp**（默认） | 设置 model_path 指向 .gguf 文件 | ~1.2 GB 模型 | 轻量离线，无需外部服务 |
-| **Ollama** | `ollama pull qwen3.5:2b` | ~9 GB（服务+模型） | 完全离线，多模型管理 |
+| **llama.cpp**（默认） | 设置 model_path 或留空自动下载 | ~2.6 GB GGUF 模型 | 轻量离线，无需外部服务，推荐 |
+| **Ollama**（可选） | `ollama pull qwen3.5:2b` | Ollama 服务 + ~2 GB 模型 | 多模型管理，需安装 Ollama |
 | **OpenAI 兼容** | 设置 endpoint + api_key | — | 云端 LLM（OpenAI、DeepSeek、vLLM 等） |
 | **None** | — | — | 仅转写，不润色 |
 
@@ -148,34 +148,32 @@ output:
 | 组件 | 模型 | 内存占用 | 说明 |
 |------|------|----------|------|
 | **ASR** | SenseVoice-Small | ~3 GB | 加载后常驻（Python 进程内） |
-| **LLM (llama.cpp)** | Qwen3.5-4B-Q4_K_M | ~2 GB | 进程内加载，~2s 推理，无额外服务开销 |
-| **LLM (Ollama)** | Qwen3.5:2b | ~5 GB + ~4 GB 服务 | Ollama 服务本身占 ~4GB |
+| **LLM (llama.cpp)** | Qwen3.5-4B-Q4_K_M | ~4 GB | 进程内加载，~2s 推理，无额外服务开销 |
+| **LLM (Ollama)** | Qwen3.5:2b | ~2 GB 模型 + Ollama 服务 | 需额外安装 Ollama（可选） |
 
-> 💡 **推荐使用 llama.cpp 提供者**（默认）：相比 Ollama 方案节省 ~7GB 内存（无需 Ollama 服务常驻 + 模型加载更高效），首次使用自动下载 ~2.6GB 模型。
-
-> ⚠️ **关于 Ollama 内存占用**：Ollama 服务本身即使没有加载任何模型也会占用 ~4GB 内存（Go runtime + 预分配）。如果你不需要 LLM 润色功能，可以在系统设置中关闭 Ollama 开机自启来节省这 4GB。TalkRefine 默认关闭 LLM 润色，仅使用 ASR 语音识别（~3GB）。
+> 💡 **推荐使用 llama.cpp 提供者**（默认）：无需安装额外服务，首次使用自动下载 ~2.6GB GGUF 模型到 `~/.talkrefine/models/`。锁屏时自动卸载模型释放内存，解锁后自动恢复。
 
 ### 使用模式对比
 
 | 模式 | LLM 后端 | 总内存 | 说明 |
 |------|----------|--------|------|
-| **仅语音识别**（默认） | 无 | ~3 GB | 只做语音→文字，不润色 |
-| **语音识别 + llama.cpp 润色** | llama.cpp | ~5 GB | 轻量离线润色，推荐 |
-| **语音识别 + Ollama 润色** | Ollama | ~12 GB | 语音→文字→去口水词→结构化 |
+| **仅语音识别** | 无 | ~3 GB | 只做语音→文字，不润色 |
+| **语音识别 + llama.cpp 润色**（推荐） | llama.cpp | ~7 GB | 轻量离线润色，无需额外服务 |
+| **语音识别 + Ollama 润色** | Ollama（可选） | ~5 GB + Ollama 服务 | 需安装 Ollama |
 
 ### 智能内存管理
 
-开启 LLM 润色时，TalkRefine 自动管理模型内存：
+开启 LLM 润色时，TalkRefine 自动管理模型内存（llama.cpp 和 Ollama 均支持）：
 
 | 场景 | 行为 | LLM 内存 |
 |------|------|----------|
-| 正常使用 | 模型常驻内存，响应 ~1-2 秒 | ~2 GB (llama.cpp) / ~5 GB (Ollama) |
-| **锁屏离开** | 自动卸载模型 | **释放** |
-| **解锁回来** | 自动重新加载 | 恢复（热缓存 ~1s） |
-| 设置中关闭 LLM | 立即卸载模型 | **释放** |
-| 设置中开启 LLM | 自动加载 | 恢复 |
+| 正常使用 | 模型常驻内存，响应 ~1-2 秒 | ~4 GB (llama.cpp) |
+| **锁屏离开** | 自动卸载模型（`del` + `gc.collect()`） | **释放** |
+| **解锁回来** | 自动重新加载 | 恢复 |
+| 设置中关闭 LLM | 后台线程卸载模型 | **释放** |
+| 设置中开启 LLM | 后台线程加载模型 | 恢复 |
 
-> 💡 不需要 LLM 润色的用户可以完全不装 Ollama 或 GGUF 模型，TalkRefine 仅用 SenseVoice 做语音识别也很好用。
+> 💡 不需要 LLM 润色的用户无需下载 GGUF 模型或安装 Ollama，TalkRefine 仅用 SenseVoice 做语音识别（~3GB）也很好用。
 
 ## 架构
 
@@ -237,11 +235,12 @@ python -m talkrefine --uninstall
 pip uninstall funasr modelscope torch torchaudio pyaudio -y
 
 # 3. 删除模型缓存
+Remove-Item -Recurse -Force "$env:USERPROFILE\.talkrefine\models"
 Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\modelscope"
 
-# 4. 卸载 Ollama（可选）
-winget uninstall Ollama.Ollama
-Remove-Item -Recurse -Force "$env:USERPROFILE\.ollama"
+# 4. 卸载 Ollama（如果安装了）
+# winget uninstall Ollama.Ollama
+# Remove-Item -Recurse -Force "$env:USERPROFILE\.ollama"
 ```
 
 ## License

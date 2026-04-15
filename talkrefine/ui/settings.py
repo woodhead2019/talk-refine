@@ -538,6 +538,12 @@ class SettingsWindow:
         if provider == "llamacpp":
             self.model_path_label.grid()
             self.mp_inner.grid()
+            # Pre-fill with default model path if empty and model exists
+            if not self.llm_model_path_var.get().strip():
+                from talkrefine.llm.llamacpp import DEFAULT_MODEL_DIR, DEFAULT_GGUF_FILE
+                default_path = DEFAULT_MODEL_DIR / DEFAULT_GGUF_FILE
+                if default_path.exists():
+                    self.llm_model_path_var.set(str(default_path))
         else:
             self.model_path_label.grid_remove()
             self.mp_inner.grid_remove()
