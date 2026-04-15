@@ -162,6 +162,23 @@ class TalkRefineApp:
 
         self._models_ready = True
 
+        # Start session monitor (unload LLM on lock, warmup on unlock)
+        if self.config["llm"]["enabled"]:
+            try:
+                from talkrefine.platform.session_monitor import start_session_monitor
+
+                def on_lock():
+                    if hasattr(self.llm, 'unload'):
+                        self.llm.unload()
+
+                def on_unlock():
+                    if hasattr(self.llm, 'warmup'):
+                        self.llm.warmup()
+
+                start_session_monitor(on_lock=on_lock, on_unlock=on_unlock)
+            except Exception:
+                logger.exception("Session monitor failed to start")
+
         hotkey = self.config["hotkey"].upper()
         logger.info("\n🟢 Ready! Press [%s] to record", hotkey)
 
