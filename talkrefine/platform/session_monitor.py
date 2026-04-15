@@ -19,8 +19,9 @@ _on_unlock = None
 
 def _create_hidden_window():
     """Create a hidden window to receive session change messages."""
+    # LRESULT is 64-bit on Win64 — use c_longlong to avoid overflow
     WNDPROC = ctypes.WINFUNCTYPE(
-        ctypes.c_long, ctypes.wintypes.HWND, ctypes.c_uint,
+        ctypes.c_longlong, ctypes.wintypes.HWND, ctypes.c_uint,
         ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM
     )
 

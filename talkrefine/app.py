@@ -144,28 +144,38 @@ class TalkRefineApp:
 
     def _overlay_show(self, text, color="#a6e3a1"):
         """Thread-safe overlay show."""
-        if self.overlay:
-            self.overlay.root.after(0, lambda: self.overlay.show(text))
+        if not self.overlay:
+            return
+        try:
+            self.overlay.root.after_idle(lambda: self.overlay.show(text))
+        except Exception:
+            pass
 
     def _overlay_status(self, text, color="#cdd6f4"):
         """Thread-safe overlay set_status."""
-        if self.overlay:
-            self.overlay.root.after(0, lambda: self.overlay.set_status(text, color))
+        if not self.overlay:
+            return
+        try:
+            self.overlay.root.after_idle(lambda: self.overlay.set_status(text, color))
+        except Exception:
+            pass
 
     def _overlay_hide(self, delay_ms=3000):
         """Thread-safe overlay schedule_hide."""
-        if self.overlay:
-            self.overlay.root.after(0, lambda: self.overlay.schedule_hide(delay_ms))
+        if not self.overlay:
+            return
+        try:
+            self.overlay.root.after_idle(lambda: self.overlay.schedule_hide(delay_ms))
+        except Exception:
+            pass
 
     def init_models(self):
         """Load ASR model and LLM provider (called from background thread)."""
         # Update overlay via tkinter thread-safe method
+        # Update overlay via thread-safe helpers
         def _show_status(text, color="#89b4fa"):
-            if self.overlay:
-                self.overlay.root.after(0, lambda: (
-                    self._overlay_show(text),
-                    self._overlay_status(text, color)
-                ))
+            self._overlay_show(text)
+            self._overlay_status(text, color)
 
         _show_status(self.s["loading"])
 
@@ -214,15 +224,17 @@ class TalkRefineApp:
 
         hotkey = self.config["hotkey"].upper()
         logger.info("\n🟢 Ready! Press [%s] to record", hotkey)
-
-        if self.overlay:
-            self.overlay.root.after(0, lambda: (
-                self._overlay_status(
-                    self.s["ready"].format(hotkey=hotkey), "#a6e3a1"),
-                self._overlay_hide(2000)
-            ))
+        self._overlay_status(self.s["ready"].format(hotkey=hotkey), "#a6e3a1")
+        self._overlay_hide(2000)
 
     def toggle_recording(self):
+        try:
+            self._toggle_recording_inner()
+        except Exception:
+            logger.exception("toggle_recording error")
+            self._processing = False
+
+    def _toggle_recording_inner(self):
         if not self._models_ready:
             if self.overlay:
                 self._overlay_show(self.s["model_not_ready"])
@@ -295,13 +307,16 @@ class TalkRefineApp:
 
         # Unload old model if LLM was disabled, warmup if enabled (non-blocking)
         def _llm_memory_op():
-            if not new_config["llm"]["enabled"]:
-                if hasattr(old_llm, 'unload'):
-                    old_llm.unload()
-                    logger.info("💾 LLM model unloaded (freed memory)")
-            elif new_config["llm"]["enabled"] and hasattr(self.llm, 'warmup'):
-                self.llm.warmup()
-                logger.info("🔥 LLM model warmed up")
+            try:
+                if not new_config["llm"]["enabled"]:
+                    if hasattr(old_llm, 'unload'):
+                        old_llm.unload()
+                        logger.info("💾 LLM model unloaded (freed memory)")
+                elif new_config["llm"]["enabled"] and hasattr(self.llm, 'warmup'):
+                    self.llm.warmup()
+                    logger.info("🔥 LLM model warmed up")
+            except Exception:
+                logger.exception("LLM memory operation failed")
         threading.Thread(target=_llm_memory_op, daemon=True).start()
 
         # Reload prompt
