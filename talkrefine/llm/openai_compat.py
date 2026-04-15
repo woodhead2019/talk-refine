@@ -1,7 +1,10 @@
 """OpenAI-compatible LLM provider (works with OpenAI, DeepSeek, vLLM, LM Studio, etc.)."""
 
+import logging
 import requests
 from .base import LLMProvider
+
+logger = logging.getLogger("talkrefine")
 
 
 class OpenAIProvider(LLMProvider):
@@ -42,5 +45,5 @@ class OpenAIProvider(LLMProvider):
                 return choices[0]["message"]["content"].strip()
             return raw_text
         except Exception as e:
-            print(f"⚠️  LLM refinement failed ({e}), using raw text")
+            logger.error("LLM refinement failed (%s), using raw text", e)
             return raw_text

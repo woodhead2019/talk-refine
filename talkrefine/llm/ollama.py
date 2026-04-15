@@ -1,7 +1,10 @@
 """Ollama LLM provider."""
 
+import logging
 import requests
 from .base import LLMProvider
+
+logger = logging.getLogger("talkrefine")
 
 
 class OllamaProvider(LLMProvider):
@@ -71,5 +74,5 @@ class OllamaProvider(LLMProvider):
             result = resp.json().get("response", "").strip()
             return result if result else raw_text
         except Exception as e:
-            print(f"⚠️  LLM refinement failed ({e}), using raw text")
+            logger.error("LLM refinement failed (%s), using raw text", e)
             return raw_text

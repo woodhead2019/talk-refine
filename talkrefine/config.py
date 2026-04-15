@@ -2,7 +2,10 @@
 
 import os
 import copy
+import logging
 from pathlib import Path
+
+logger = logging.getLogger("talkrefine")
 
 DEFAULTS = {
     "hotkey": "f8",
@@ -73,7 +76,7 @@ def load_config(path: str | Path | None = None) -> dict:
     try:
         import yaml
     except ImportError:
-        print("⚠️  PyYAML not installed, using default config")
+        logger.warning("PyYAML not installed, using default config")
         return copy.deepcopy(DEFAULTS)
 
     if path is None:
@@ -90,5 +93,5 @@ def load_config(path: str | Path | None = None) -> dict:
         user_config = yaml.safe_load(f) or {}
 
     config = _deep_merge(DEFAULTS, user_config)
-    print(f"📄 配置: {path}")
+    logger.info("Config loaded from %s", path)
     return config

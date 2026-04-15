@@ -3,7 +3,10 @@
 import os
 import sys
 import time
+import logging
 import threading
+
+logger = logging.getLogger("talkrefine")
 
 
 _hotkey_manager = None
@@ -130,7 +133,7 @@ def setup_autostart(enable: bool = True):
                                 f'"{vbs_path}"', project_root,
                                 "TalkRefine", ico_path)
         except Exception as e:
-            print(f"⚠️  Startup shortcut: {e}")
+            logger.warning("Startup shortcut failed: %s", e)
     else:
         if os.path.exists(shortcut_path):
             os.remove(shortcut_path)
@@ -167,7 +170,7 @@ def create_start_menu_shortcut():
                             "TalkRefine - Voice to refined text", ico_path)
         return shortcut_path
     except Exception as e:
-        print(f"⚠️  Failed to create shortcut: {e}")
+        logger.warning("Failed to create shortcut: %s", e)
         return None
 
 
