@@ -1,4 +1,4 @@
-# TalkRefine Configuration
+﻿# TalkRefine Configuration
 # Copy this file to config.yaml and customize.
 
 # ── Hotkeys ──────────────────────────────────────
@@ -22,7 +22,7 @@ llm:
   provider: "llamacpp"    # "llamacpp" (lightweight, default) | "ollama" | "openai" (OpenAI-compatible API) | "none"
   # llama.cpp settings (when provider is "llamacpp")
   model_path: ""          # Path to .gguf file. Leave empty = auto-download
-                          # Qwen3-1.7B-Q4_K_M (~1.2GB) on first use.
+                          # Qwen3.5-4B-Q4_K_M (~2.6GB) on first use.
                           # Default location: ~/.talkrefine/models/
   # To use Ollama instead:
   #   1. Install Ollama: winget install Ollama.Ollama

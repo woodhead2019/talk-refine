@@ -1,4 +1,4 @@
-# 🎤 TalkRefine
+﻿# 🎤 TalkRefine
 
 **自然说话，输出精炼文字。** 本地离线语音输入 + LLM 润色工具。
 
@@ -58,9 +58,9 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 pip install wheels/llama_cpp_python-0.3.20-py3-none-win_amd64.whl
 pip install funasr modelscope pyaudio pyperclip pyautogui requests pystray Pillow pyyaml huggingface_hub
 
-# 3. GGUF 模型会在首次启用 LLM 时自动下载（~1.2GB）
+# 3. GGUF 模型会在首次启用 LLM 时自动下载（~2.6GB）
 #    或手动下载：
-python -c "from huggingface_hub import hf_hub_download; hf_hub_download('bartowski/Qwen_Qwen3-1.7B-GGUF', 'Qwen_Qwen3-1.7B-Q4_K_M.gguf', local_dir=str(__import__('pathlib').Path.home() / '.talkrefine/models'))"
+python -c "from huggingface_hub import hf_hub_download; hf_hub_download('unsloth/Qwen3.5-4B-GGUF', 'Qwen3.5-4B-Q4_K_M.gguf', local_dir=str(__import__('pathlib').Path.home() / '.talkrefine/models'))"
 
 # 4. 运行
 python -m talkrefine
@@ -148,10 +148,10 @@ output:
 | 组件 | 模型 | 内存占用 | 说明 |
 |------|------|----------|------|
 | **ASR** | SenseVoice-Small | ~3 GB | 加载后常驻（Python 进程内） |
-| **LLM (llama.cpp)** | Qwen3-1.7B-Q4_K_M | ~2 GB | 进程内加载，~2s 推理，无额外服务开销 |
+| **LLM (llama.cpp)** | Qwen3.5-4B-Q4_K_M | ~2 GB | 进程内加载，~2s 推理，无额外服务开销 |
 | **LLM (Ollama)** | Qwen3.5:2b | ~5 GB + ~4 GB 服务 | Ollama 服务本身占 ~4GB |
 
-> 💡 **推荐使用 llama.cpp 提供者**（默认）：相比 Ollama 方案节省 ~7GB 内存（无需 Ollama 服务常驻 + 模型加载更高效），首次使用自动下载 ~1.2GB 模型。
+> 💡 **推荐使用 llama.cpp 提供者**（默认）：相比 Ollama 方案节省 ~7GB 内存（无需 Ollama 服务常驻 + 模型加载更高效），首次使用自动下载 ~2.6GB 模型。
 
 > ⚠️ **关于 Ollama 内存占用**：Ollama 服务本身即使没有加载任何模型也会占用 ~4GB 内存（Go runtime + 预分配）。如果你不需要 LLM 润色功能，可以在系统设置中关闭 Ollama 开机自启来节省这 4GB。TalkRefine 默认关闭 LLM 润色，仅使用 ASR 语音识别（~3GB）。
 

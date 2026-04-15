@@ -10,8 +10,8 @@ logger = logging.getLogger("talkrefine")
 
 # Default model location & GGUF settings
 DEFAULT_MODEL_DIR = Path.home() / ".talkrefine" / "models"
-DEFAULT_REPO_ID = "bartowski/Qwen_Qwen3-1.7B-GGUF"
-DEFAULT_GGUF_FILE = "Qwen_Qwen3-1.7B-Q4_K_M.gguf"
+DEFAULT_REPO_ID = "unsloth/Qwen3.5-4B-GGUF"
+DEFAULT_GGUF_FILE = "Qwen3.5-4B-Q4_K_M.gguf"
 
 # Regex to strip <think>...</think> blocks from Qwen3 output
 _THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
@@ -44,7 +44,7 @@ class LlamaCppProvider(LLMProvider):
         if default_file.exists():
             return str(default_file)
 
-        logger.info("Downloading GGUF model (%s, ~1.2GB)...", DEFAULT_GGUF_FILE)
+        logger.info("Downloading GGUF model (%s, ~2.6GB)...", DEFAULT_GGUF_FILE)
         path = hf_hub_download(
             repo_id=DEFAULT_REPO_ID,
             filename=DEFAULT_GGUF_FILE,
@@ -94,9 +94,6 @@ class LlamaCppProvider(LLMProvider):
             return raw_text
 
         prompt = prompt_template.replace("{text}", raw_text)
-
-        # Prepend /no_think for Qwen3 models to disable thinking mode
-        prompt = f"/no_think\n{prompt}"
 
         try:
             output = self._llm.create_chat_completion(
