@@ -1,5 +1,14 @@
 """TalkRefine - Local voice input with LLM refinement."""
 
+# Fix stdout/stderr FIRST — before any import that might print/flush.
+# pythonw.exe may set them to None OR to a closed file handle.
+# Third-party libs (funasr, tqdm, huggingface_hub) crash on print()/flush().
+import sys as _sys, os as _os
+for _name in ("stdout", "stderr"):
+    _s = getattr(_sys, _name, None)
+    if _s is None or getattr(_s, "closed", False):
+        setattr(_sys, _name, open(_os.devnull, "w", encoding="utf-8"))
+
 __version__ = "0.1.0"
 
 # Validate i18n strings in debug/development
