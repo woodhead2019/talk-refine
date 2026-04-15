@@ -117,11 +117,11 @@ function Ask-YesNo($prompt, $default = "Y") {
 
 $installPythonRT  = Ask-YesNo "  [1] Python runtime (if not installed)"
 $installFFmpeg    = Ask-YesNo "  [2] ffmpeg (audio processing)"
-$installGGUFModel = Ask-YesNo "  [3] GGUF model (~1.5GB, for lightweight LLM via llama.cpp)"
+$installGGUFModel = Ask-YesNo "  [3] GGUF model (~1.2GB, for lightweight LLM via llama.cpp)"
 $installPython    = Ask-YesNo "  [4] Python packages (torch, funasr, llama-cpp-python, etc.)"
 $installASRModel  = Ask-YesNo "  [5] SenseVoice ASR model (~944MB, for speech recognition)"
 $setupAutostart   = Ask-YesNo "  [6] Autostart + Start Menu shortcut"
-$installOllama    = Ask-YesNo "  [7] Ollama (optional, alternative LLM runtime)" "N"
+$installOllama    = Ask-YesNo "  [7] Ollama (optional, only if you prefer Ollama over llama.cpp)" "N"
 $installLLMModel  = $false
 if ($installOllama) {
     $installLLMModel = Ask-YesNo "  [8] Qwen3.5:2b Ollama model (~2GB, for text refinement via Ollama)"
@@ -219,14 +219,14 @@ if ($installFFmpeg) {
 # ── GGUF Model (llama.cpp) ──
 if ($installGGUFModel) {
     $step++
-    Write-Host "[$step/$total] Downloading GGUF model (Qwen3.5-2B-Q4_K_M ~1.5GB)..." -ForegroundColor Cyan
+    Write-Host "[$step/$total] Downloading GGUF model (Qwen3-1.7B-Q4_K_M ~1.2GB)..." -ForegroundColor Cyan
     $modelDir = Join-Path $env:USERPROFILE ".talkrefine\models"
-    $modelFile = Join-Path $modelDir "Qwen3.5-2B-Q4_K_M.gguf"
+    $modelFile = Join-Path $modelDir "Qwen_Qwen3-1.7B-Q4_K_M.gguf"
     if (Test-Path $modelFile) {
         Write-Host "  [OK] Already downloaded" -ForegroundColor Green
     } else {
         if (-not (Test-Path $modelDir)) { New-Item -ItemType Directory -Path $modelDir -Force | Out-Null }
-        Write-Host "  Downloading via huggingface_hub (~1.5GB, may take a few minutes)..." -ForegroundColor Yellow
+        Write-Host "  Downloading via huggingface_hub (~1.2GB, may take a few minutes)..." -ForegroundColor Yellow
         $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
         $projectDir = Split-Path -Parent $scriptDir
         Push-Location $projectDir
@@ -236,8 +236,8 @@ if ($installGGUFModel) {
         python -c "
 from huggingface_hub import hf_hub_download
 path = hf_hub_download(
-    repo_id='unsloth/Qwen3.5-2B-GGUF',
-    filename='Qwen3.5-2B-Q4_K_M.gguf',
+    repo_id='bartowski/Qwen_Qwen3-1.7B-GGUF',
+    filename='Qwen_Qwen3-1.7B-Q4_K_M.gguf',
     local_dir=r'$modelDir',
 )
 print(f'Downloaded to: {path}')
@@ -310,6 +310,15 @@ if ($installPython) {
 
     # Install talkrefine + all dependencies from pyproject.toml
     Write-Host "  Installing talkrefine and dependencies..." -ForegroundColor Yellow
+
+    # Try pre-built llama-cpp-python wheel first (faster, no C++ compiler needed)
+    $wheelDir = Join-Path $projectDir "wheels"
+    $wheel = Get-ChildItem -Path $wheelDir -Filter "llama_cpp_python*.whl" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($wheel) {
+        Write-Host "  Installing llama-cpp-python from local wheel..." -ForegroundColor Yellow
+        pip install $wheel.FullName --quiet 2>&1 | Out-Null
+    }
+
     pip install -e ".[win32,llamacpp]" --quiet 2>&1 | Out-Null
 
     # Verify critical packages

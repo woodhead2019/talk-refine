@@ -2,13 +2,19 @@
 
 import logging
 import os
+import re
 from pathlib import Path
 from .base import LLMProvider
 
 logger = logging.getLogger("talkrefine")
 
-# Default model location
+# Default model location & GGUF settings
 DEFAULT_MODEL_DIR = Path.home() / ".talkrefine" / "models"
+DEFAULT_REPO_ID = "bartowski/Qwen_Qwen3-1.7B-GGUF"
+DEFAULT_GGUF_FILE = "Qwen_Qwen3-1.7B-Q4_K_M.gguf"
+
+# Regex to strip <think>...</think> blocks from Qwen3 output
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
 
 
 class LlamaCppProvider(LLMProvider):
@@ -27,13 +33,37 @@ class LlamaCppProvider(LLMProvider):
         model_name = Path(self._model_path).stem if self._model_path else "not loaded"
         return f"llama.cpp ({model_name})"
 
+    def _auto_download_model(self) -> str:
+        """Download default GGUF model if not present."""
+        from huggingface_hub import hf_hub_download
+
+        model_dir = DEFAULT_MODEL_DIR
+        model_dir.mkdir(parents=True, exist_ok=True)
+
+        default_file = model_dir / DEFAULT_GGUF_FILE
+        if default_file.exists():
+            return str(default_file)
+
+        logger.info("Downloading GGUF model (%s, ~1.2GB)...", DEFAULT_GGUF_FILE)
+        path = hf_hub_download(
+            repo_id=DEFAULT_REPO_ID,
+            filename=DEFAULT_GGUF_FILE,
+            local_dir=str(model_dir),
+        )
+        logger.info("GGUF model downloaded: %s", path)
+        return path
+
     def load(self):
         """Load the GGUF model into memory."""
         from llama_cpp import Llama
 
+        # Auto-download if model_path is empty or doesn't exist
         if not self._model_path or not os.path.exists(self._model_path):
-            logger.error("Model file not found: %s", self._model_path)
-            return
+            try:
+                self._model_path = self._auto_download_model()
+            except Exception as e:
+                logger.error("Failed to auto-download model: %s", e)
+                return
 
         logger.info("Loading GGUF model: %s", self._model_path)
         self._llm = Llama(
@@ -64,15 +94,20 @@ class LlamaCppProvider(LLMProvider):
             return raw_text
 
         prompt = prompt_template.replace("{text}", raw_text)
+
+        # Prepend /no_think for Qwen3 models to disable thinking mode
+        prompt = f"/no_think\n{prompt}"
+
         try:
-            output = self._llm(
-                prompt,
+            output = self._llm.create_chat_completion(
+                messages=[{"role": "user", "content": prompt}],
                 max_tokens=self._max_tokens,
                 temperature=self._temperature,
-                stop=["\n\n"],
-                echo=False,
+                stop=["<|endoftext|>", "<|im_end|>"],
             )
-            result = output["choices"][0]["text"].strip()
+            result = output["choices"][0]["message"]["content"].strip()
+            # Strip any <think>...</think> blocks as safety net
+            result = _THINK_RE.sub("", result).strip()
             return result if result else raw_text
         except Exception as e:
             logger.error("LLM refinement failed: %s", e)

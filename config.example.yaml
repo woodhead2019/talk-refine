@@ -19,9 +19,15 @@ asr:
 # ── LLM (Text Refinement) ───────────────────────
 llm:
   enabled: true           # Set false to get raw transcription only
-  provider: "llamacpp"    # "llamacpp" (lightweight) | "ollama" | "openai" (OpenAI-compatible API) | "none"
+  provider: "llamacpp"    # "llamacpp" (lightweight, default) | "ollama" | "openai" (OpenAI-compatible API) | "none"
   # llama.cpp settings (when provider is "llamacpp")
-  model_path: ""          # Path to .gguf file. Leave empty to skip LLM.
+  model_path: ""          # Path to .gguf file. Leave empty = auto-download
+                          # Qwen3-1.7B-Q4_K_M (~1.2GB) on first use.
+                          # Default location: ~/.talkrefine/models/
+  # To use Ollama instead:
+  #   1. Install Ollama: winget install Ollama.Ollama
+  #   2. Pull a model: ollama pull qwen3.5:2b
+  #   3. Set provider: "ollama" below
   # Ollama settings (when provider is "ollama")
   endpoint: "http://localhost:11434"   # Ollama default
   # endpoint: "https://api.openai.com"  # OpenAI

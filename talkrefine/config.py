@@ -17,10 +17,10 @@ DEFAULTS = {
     },
     "llm": {
         "enabled": False,
-        "provider": "ollama",
+        "provider": "llamacpp",
         "endpoint": "http://localhost:11434",
         "model": "qwen3.5:2b",
-        "model_path": "",
+        "model_path": "",  # Empty = auto-download on first use
         "api_key": "",
         "prompt": "default",
         "temperature": 0.1,
