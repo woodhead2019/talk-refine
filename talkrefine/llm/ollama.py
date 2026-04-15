@@ -26,9 +26,25 @@ class OllamaProvider(LLMProvider):
                     "model": self._model,
                     "prompt": "",
                     "stream": False,
-                    "keep_alive": "24h",
+                    "keep_alive": -1,
                 },
                 timeout=60,
+            )
+        except Exception:
+            pass
+
+    def unload(self):
+        """Release model from memory (restore Ollama auto-unload)."""
+        try:
+            requests.post(
+                f"{self._endpoint}/api/generate",
+                json={
+                    "model": self._model,
+                    "prompt": "",
+                    "stream": False,
+                    "keep_alive": "0",
+                },
+                timeout=10,
             )
         except Exception:
             pass
@@ -43,7 +59,7 @@ class OllamaProvider(LLMProvider):
                     "prompt": prompt,
                     "stream": False,
                     "think": False,
-                    "keep_alive": "24h",
+                    "keep_alive": -1,
                     "options": {
                         "temperature": self._temperature,
                         "num_predict": self._max_tokens,
