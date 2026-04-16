@@ -1,6 +1,8 @@
 """FunASR SenseVoice engine - optimized for Chinese."""
 
 import re
+import wave
+import numpy as np
 from .base import ASREngine
 
 # ModelScope -> HuggingFace model ID mapping
@@ -36,12 +38,27 @@ class SenseVoiceEngine(ASREngine):
             hub=self._hub,
         )
 
+    @staticmethod
+    def _load_wav(path: str) -> np.ndarray:
+        """Load WAV as float32 numpy array, bypassing ffmpeg subprocess."""
+        with wave.open(path, "rb") as wf:
+            frames = wf.readframes(wf.getnframes())
+            dtype = {2: np.int16, 4: np.int32}[wf.getsampwidth()]
+            audio = np.frombuffer(frames, dtype=dtype).astype(np.float32)
+            audio /= np.iinfo(dtype).max
+            if wf.getnchannels() > 1:
+                audio = audio.reshape(-1, wf.getnchannels()).mean(axis=1)
+        return audio
+
     def transcribe(self, audio_path: str, language: str = "auto") -> str:
         if self._model is None:
             raise RuntimeError("Model not loaded. Call load() first.")
 
+        # Load audio ourselves to avoid funasr's ffmpeg subprocess flash
+        audio_data = self._load_wav(audio_path)
+
         lang = language if language != "auto" else None
-        kwargs = {"input": audio_path, "use_itn": True}
+        kwargs = {"input": audio_data, "use_itn": True}
         if lang:
             kwargs["language"] = lang
         result = self._model.generate(**kwargs)
