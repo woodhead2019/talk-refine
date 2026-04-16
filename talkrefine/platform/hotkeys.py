@@ -46,6 +46,84 @@ def _parse_key(key_str: str):
     return modifiers, vk
 
 
+class KeySuppressor:
+    """Low-level keyboard hook that intercepts a key and prevents it from
+    reaching other applications.  Used during recording so that ESC only
+    cancels recording and is not forwarded to the focused window behind
+    the overlay."""
+
+    _WH_KEYBOARD_LL = 13
+    _WM_KEYDOWN = 0x0100
+
+    def __init__(self, vk_code: int, callback):
+        self._vk = vk_code
+        self._callback = callback
+        self._hook = None
+        self._thread = None
+        self._thread_id = None
+        self._active = False
+        # prevent GC of the C callback
+        self._c_proc = ctypes.CFUNCTYPE(
+            ctypes.c_long, ctypes.c_int,
+            ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM
+        )(self._hook_proc)
+
+    # -- public API -----------------------------------------------------------
+
+    def start(self):
+        if self._active:
+            return
+        self._active = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        if not self._active:
+            return
+        self._active = False
+        if self._thread_id:
+            # WM_QUIT = 0x0012
+            ctypes.windll.user32.PostThreadMessageW(
+                self._thread_id, 0x0012, 0, 0)
+
+    # -- internals ------------------------------------------------------------
+
+    def _hook_proc(self, nCode, wParam, lParam):
+        if nCode >= 0 and self._active and wParam == self._WM_KEYDOWN:
+            # lParam points to KBDLLHOOKSTRUCT; first DWORD is vkCode
+            vk = ctypes.cast(lParam, ctypes.POINTER(ctypes.c_ulong))[0]
+            if vk == self._vk:
+                try:
+                    self._callback()
+                except Exception:
+                    logger.exception("KeySuppressor callback error")
+                return 1  # suppress — do NOT call next hook
+        return ctypes.windll.user32.CallNextHookEx(
+            self._hook, nCode, wParam, lParam)
+
+    def _run(self):
+        user32 = ctypes.windll.user32
+        self._thread_id = ctypes.windll.kernel32.GetCurrentThreadId()
+
+        self._hook = user32.SetWindowsHookExW(
+            self._WH_KEYBOARD_LL, self._c_proc, None, 0)
+        if not self._hook:
+            logger.error("SetWindowsHookExW failed, error=%d",
+                         ctypes.GetLastError())
+            self._active = False
+            return
+
+        msg = ctypes.wintypes.MSG()
+        while self._active:
+            ret = user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+            if ret <= 0:
+                break
+
+        user32.UnhookWindowsHookEx(self._hook)
+        self._hook = None
+        self._thread_id = None
+
+
 class HotkeyManager:
     """Manages global hotkeys via Win32 RegisterHotKey API."""
 

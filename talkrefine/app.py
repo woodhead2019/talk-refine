@@ -247,11 +247,18 @@ class TalkRefineApp:
     def cancel_recording(self):
         if not self.recorder.recording:
             return
+        self._stop_cancel_suppressor()
         self.recorder.stop()
         logger.info("🚫 Recording cancelled")
         if self.overlay:
             self._overlay_status(self.s["cancelled"], "#f9e2af")
             self._overlay_hide(1500)
+
+    def _stop_cancel_suppressor(self):
+        sup = getattr(self, "_cancel_suppressor", None)
+        if sup:
+            sup.stop()
+            self._cancel_suppressor = None
 
     def reload_config(self, new_config: dict):
         """Hot-reload config. ASR model changes still need restart."""
@@ -345,25 +352,15 @@ class TalkRefineApp:
             text = self.s["recording"].format(hotkey=hotkey, cancel=cancel)
             self._overlay_show(text)
 
-        # Poll cancel key (ESC) during recording — not registered globally
+        # Suppress cancel key during recording so it doesn't leak to background apps
         cancel_key = self.config.get("cancel_key", "esc")
-        from talkrefine.platform.hotkeys import _parse_key
+        from talkrefine.platform.hotkeys import _parse_key, KeySuppressor
         _, cancel_vk = _parse_key(cancel_key)
-
-        def poll_cancel():
-            import ctypes
-            import time
-            user32 = ctypes.windll.user32
-            while self.recorder.recording:
-                # GetAsyncKeyState returns negative if key is pressed
-                if user32.GetAsyncKeyState(cancel_vk) & 0x8000:
-                    self.cancel_recording()
-                    break
-                time.sleep(0.1)
-
-        threading.Thread(target=poll_cancel, daemon=True).start()
+        self._cancel_suppressor = KeySuppressor(cancel_vk, self.cancel_recording)
+        self._cancel_suppressor.start()
 
     def _stop_and_process(self):
+        self._stop_cancel_suppressor()
         from talkrefine.recorder import SAMPLE_RATE, CHANNELS
         frames = self.recorder.stop()
 
@@ -541,7 +538,7 @@ class TalkRefineApp:
         # 3. Register hotkeys immediately (before models are loaded)
         from talkrefine.platform import windows as plat
         plat.register_hotkey(hotkey, self.toggle_recording)
-        # ESC is NOT registered globally — only polled during recording
+        # Cancel key (ESC) is handled by KeySuppressor during recording only
         plat.start_hotkey_listener()
         logger.info("💡 Right-click tray icon to quit\n")
 
