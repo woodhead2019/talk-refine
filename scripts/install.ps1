@@ -392,5 +392,5 @@ Write-Host "  ========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Start: Search 'TalkRefine' in Start Menu"
 Write-Host "  Or run: .\venv\Scripts\Activate.ps1; python -m talkrefine"
-Write-Host "  Hotkey: Press F6 to record (configurable in settings)"
+Write-Host "  Hotkey: Press F8 to record (configurable in settings)"
 Write-Host ""
