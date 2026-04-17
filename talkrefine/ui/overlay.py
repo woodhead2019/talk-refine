@@ -124,8 +124,17 @@ class VolumeOverlay:
         self.root.withdraw()
         self._update_loop()
 
+    def _center_on_screen(self):
+        """Recalculate position to stay centered at screen bottom."""
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        x = (screen_w - self.width) // 2
+        y = screen_h - self.height - 100
+        self.root.geometry(f"+{x}+{y}")
+
     def show(self, text: str = "🎤 录音中..."):
         self.set_status(text, "#a6e3a1")
+        self._center_on_screen()
         self.root.deiconify()
 
     def hide(self):
