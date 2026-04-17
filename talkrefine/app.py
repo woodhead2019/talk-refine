@@ -247,18 +247,18 @@ class TalkRefineApp:
     def cancel_recording(self):
         if not self.recorder.recording:
             return
-        self._stop_cancel_suppressor()
+        self._stop_key_suppressor()
         self.recorder.stop()
         logger.info("🚫 Recording cancelled")
         if self.overlay:
             self._overlay_status(self.s["cancelled"], "#f9e2af")
             self._overlay_hide(1500)
 
-    def _stop_cancel_suppressor(self):
-        sup = getattr(self, "_cancel_suppressor", None)
+    def _stop_key_suppressor(self):
+        sup = getattr(self, "_key_suppressor", None)
         if sup:
             sup.stop()
-            self._cancel_suppressor = None
+            self._key_suppressor = None
 
     def reload_config(self, new_config: dict):
         """Hot-reload config. ASR model changes still need restart."""
@@ -352,15 +352,26 @@ class TalkRefineApp:
             text = self.s["recording"].format(hotkey=hotkey, cancel=cancel)
             self._overlay_show(text)
 
-        # Suppress cancel key during recording so it doesn't leak to background apps
-        cancel_key = self.config.get("cancel_key", "esc")
+        # Intercept keys via low-level keyboard hook during recording.
+        # RegisterHotKey alone is unreliable (especially with IMEs / pythonw),
+        # so we use WH_KEYBOARD_LL to ensure stop-recording always works.
         from talkrefine.platform.hotkeys import _parse_key, KeySuppressor
+        cancel_key = self.config.get("cancel_key", "esc")
         _, cancel_vk = _parse_key(cancel_key)
-        self._cancel_suppressor = KeySuppressor(cancel_vk, self.cancel_recording)
-        self._cancel_suppressor.start()
+        vk_callbacks = {cancel_vk: self.cancel_recording}
+
+        hotkey_key = self.config["hotkey"]
+        hotkey_mods, hotkey_vk = _parse_key(hotkey_key)
+        # Only add bare keys (no modifiers) to the hook; modified combos
+        # still rely on RegisterHotKey which can check modifier state.
+        if hotkey_vk and hotkey_vk != cancel_vk and hotkey_mods == 0:
+            vk_callbacks[hotkey_vk] = self.toggle_recording
+
+        self._key_suppressor = KeySuppressor(vk_callbacks)
+        self._key_suppressor.start()
 
     def _stop_and_process(self):
-        self._stop_cancel_suppressor()
+        self._stop_key_suppressor()
         from talkrefine.recorder import SAMPLE_RATE, CHANNELS
         frames = self.recorder.stop()
 

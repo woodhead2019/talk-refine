@@ -47,17 +47,17 @@ def _parse_key(key_str: str):
 
 
 class KeySuppressor:
-    """Low-level keyboard hook that intercepts a key and prevents it from
-    reaching other applications.  Used during recording so that ESC only
-    cancels recording and is not forwarded to the focused window behind
-    the overlay."""
+    """Low-level keyboard hook that intercepts keys and prevents them from
+    reaching other applications.  Used during recording so that the hotkey
+    and cancel key are handled reliably (WH_KEYBOARD_LL fires before
+    RegisterHotKey and is immune to IME / pythonw issues)."""
 
     _WH_KEYBOARD_LL = 13
     _WM_KEYDOWN = 0x0100
 
-    def __init__(self, vk_code: int, callback):
-        self._vk = vk_code
-        self._callback = callback
+    def __init__(self, vk_callbacks: dict):
+        """vk_callbacks: mapping {virtual_key_code: callback_function}."""
+        self._vk_callbacks = dict(vk_callbacks)
         self._hook = None
         self._thread = None
         self._thread_id = None
@@ -92,9 +92,10 @@ class KeySuppressor:
         if nCode >= 0 and self._active and wParam == self._WM_KEYDOWN:
             # lParam points to KBDLLHOOKSTRUCT; first DWORD is vkCode
             vk = ctypes.cast(lParam, ctypes.POINTER(ctypes.c_ulong))[0]
-            if vk == self._vk:
+            cb = self._vk_callbacks.get(vk)
+            if cb:
                 try:
-                    self._callback()
+                    cb()
                 except Exception:
                     logger.exception("KeySuppressor callback error")
                 return 1  # suppress — do NOT call next hook
